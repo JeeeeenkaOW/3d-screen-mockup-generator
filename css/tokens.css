@@ -1,6 +1,7 @@
 :root {
   --font-family-brand: 'Montserrat', sans-serif;
   --font-family-default: 'Lato', sans-serif;
+  --font-weight-thin: 100;
   --font-weight-regular: 400;
   --font-weight-medium: 500;
   --font-weight-semi-bold: 600;

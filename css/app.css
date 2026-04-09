@@ -11,7 +11,7 @@ body {
 /* ===== App shell ===== */
 .app { display: flex; flex-direction: column; height: 100vh; }
 
-/* ===== Header (matches creative-conversion) ===== */
+/* ===== Header ===== */
 .app-header {
   display: flex;
   align-items: center;
@@ -27,7 +27,7 @@ body {
   align-items: center;
   gap: var(--space-300);
 }
-.header-logo { height: 24px; display: block; }
+.header-logo { height: 28px; display: block; }
 .header-divider {
   width: 1px;
   height: 20px;
@@ -35,13 +35,13 @@ body {
 }
 .header-title {
   font-family: var(--font-family-brand);
-  font-weight: var(--font-weight-semi-bold);
-  font-size: 14px;
-  color: var(--color-text-primary);
-  letter-spacing: 0.5px;
+  font-weight: var(--font-weight-thin);
+  font-size: 24px;
+  color: var(--color-text-tertiary);
+  letter-spacing: 1.2px;
 }
 
-/* ===== Footer (matches creative-conversion) ===== */
+/* ===== Footer ===== */
 .app-footer {
   height: 36px;
   display: flex;
@@ -60,8 +60,7 @@ body {
   text-transform: uppercase;
 }
 
-/* ===== Buttons — per design tokens (Marketing M size for OW) ===== */
-/* Size M: padding 8px 24px, 14px Montserrat Medium 500, letter-spacing 1.2px, uppercase */
+/* ===== Buttons ===== */
 .btn-m {
   display: inline-flex;
   align-items: center;
@@ -181,6 +180,7 @@ body {
   align-items: center;
   justify-content: center;
   overflow: hidden;
+  position: relative;
 }
 .screen-image {
   display: none;
@@ -208,7 +208,7 @@ body {
   letter-spacing: 0.5px;
 }
 
-/* Gloss overlay */
+/* Gloss overlay (highlights — light gradient inside the screen) */
 .screen-gloss {
   position: absolute;
   inset: 0;
@@ -217,15 +217,23 @@ body {
   z-index: 2;
 }
 
-/* Shadow under screen */
+/* Inner shadow overlay (shading — dark gradient, opposite of gloss) */
+.screen-inner-shadow {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  z-index: 3;
+}
+
+/* Drop shadow behind screen (full 3D shadow, not just bottom) */
 .screen-shadow {
   position: absolute;
   left: 50%;
-  bottom: -20px;
-  transform: translateX(-50%);
-  width: 80%;
-  height: 40px;
-  border-radius: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 100%;
+  height: 100%;
   z-index: -1;
   pointer-events: none;
 }
@@ -294,7 +302,7 @@ body {
   flex-shrink: 0;
 }
 
-/* Slider — sharp track, OW red thumb */
+/* Slider */
 .ow-slider {
   -webkit-appearance: none;
   appearance: none;
@@ -345,7 +353,31 @@ body {
 .ow-switch input:checked + .switch-track { background: var(--color-surface-brand-ow); }
 .ow-switch input:checked + .switch-track::after { transform: translateX(16px); }
 
-/* Color pickers — sharp corners */
+/* Select dropdown */
+.ow-select {
+  width: 100%;
+  height: 32px;
+  padding: 0 var(--space-200);
+  background: var(--color-surface-secondary);
+  border: 1px solid var(--color-border-primary);
+  border-radius: 0;
+  color: var(--color-text-primary);
+  font-family: var(--font-family-brand);
+  font-size: 12px;
+  font-weight: var(--font-weight-medium);
+  outline: none;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%239F9F9F' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  padding-right: 28px;
+}
+.ow-select:focus { border-color: var(--color-surface-brand-ow); box-shadow: 0 0 0 2px rgba(211,64,55,0.20); }
+.ow-select option { background: var(--color-surface-secondary); color: var(--color-text-primary); }
+
+/* Color pickers */
 .color-row { display: flex; align-items: center; gap: var(--space-200); }
 .color-row.hidden { display: none; }
 .color-input {
@@ -417,7 +449,7 @@ body {
   font-size: 16px; color: var(--color-text-pure);
 }
 
-/* Recording overlay — full-screen cover to hide viewport during recording */
+/* Recording overlay */
 .record-overlay {
   position: fixed; inset: 0; z-index: 1000;
   background: rgba(0,0,0,0.94);
@@ -461,14 +493,28 @@ body {
   letter-spacing: 0.5px;
 }
 
-/* Animation keyframes */
-@keyframes hoverFloat {
+/* Animation keyframes — CSS-driven for live preview */
+@keyframes animTilt {
   0%, 100% { transform: rotateX(var(--anim-rx-a)) rotateY(var(--anim-ry-a)) scale(var(--screen-scale, 1)); }
   50%      { transform: rotateX(var(--anim-rx-b)) rotateY(var(--anim-ry-b)) scale(var(--screen-scale, 1)); }
 }
-.screen-wrapper.animating {
-  animation: hoverFloat var(--anim-duration, 4s) ease-in-out infinite;
+@keyframes animFloat {
+  0%, 100% { transform: rotateX(var(--anim-base-rx)) rotateY(var(--anim-base-ry)) scale(var(--screen-scale, 1)) translateY(var(--float-up)); }
+  50%      { transform: rotateX(var(--anim-base-rx)) rotateY(var(--anim-base-ry)) scale(var(--screen-scale, 1)) translateY(var(--float-down)); }
 }
+@keyframes animBreathe {
+  0%, 100% { transform: rotateX(var(--anim-base-rx)) rotateY(var(--anim-base-ry)) scale(var(--breathe-scale-a)); }
+  50%      { transform: rotateX(var(--anim-base-rx)) rotateY(var(--anim-base-ry)) scale(var(--breathe-scale-b)); }
+}
+@keyframes animTurntable {
+  0%   { transform: rotateX(var(--anim-base-rx)) rotateY(0deg) scale(var(--screen-scale, 1)); }
+  100% { transform: rotateX(var(--anim-base-rx)) rotateY(360deg) scale(var(--screen-scale, 1)); }
+}
+
+.screen-wrapper.anim-tilt      { animation: animTilt      var(--anim-duration, 4s) ease-in-out infinite; }
+.screen-wrapper.anim-float     { animation: animFloat     var(--anim-duration, 4s) ease-in-out infinite; }
+.screen-wrapper.anim-breathe   { animation: animBreathe   var(--anim-duration, 4s) ease-in-out infinite; }
+.screen-wrapper.anim-turntable { animation: animTurntable  var(--anim-duration, 4s) linear       infinite; }
 
 /* Responsive */
 @media (max-width: 900px) {
