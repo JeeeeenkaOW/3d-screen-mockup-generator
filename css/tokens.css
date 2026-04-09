@@ -1,0 +1,32 @@
+:root {
+  --font-family-brand: 'Montserrat', sans-serif;
+  --font-family-default: 'Lato', sans-serif;
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-semi-bold: 600;
+  --font-weight-bold: 700;
+  --color-background-general: #000000;
+  --color-surface-primary: #101010;
+  --color-surface-secondary: #202020;
+  --color-surface-tertiary: #303030;
+  --color-surface-quaternary: #404040;
+  --color-surface-invert: #FFFFFF;
+  --color-surface-brand-ow: #D34037;
+  --color-surface-brand-ow-hover: #F05C48;
+  --color-text-pure: #FFFFFF;
+  --color-text-primary: #DFDFDF;
+  --color-text-tertiary: #9F9F9F;
+  --color-text-cta-ow: #FFFFFF;
+  --color-border-primary: #303030;
+  --color-border-secondary: #9F9F9F;
+  --space-100: 4px;
+  --space-200: 8px;
+  --space-300: 12px;
+  --space-400: 16px;
+  --space-500: 20px;
+  --space-600: 24px;
+  --space-800: 32px;
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+}
