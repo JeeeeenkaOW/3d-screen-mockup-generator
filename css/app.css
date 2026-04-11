@@ -114,6 +114,13 @@ body {
 .upload-btn-wrap { cursor: pointer; }
 .back-image-controls { display: flex; flex-direction: column; gap: var(--space-200); }
 
+/* Collapsible sub-controls under a toggle */
+#glossControls, #innerShadowControls, #dropShadowControls {
+  display: flex; flex-direction: column; gap: var(--space-300);
+  margin-top: var(--space-300);
+}
+#glossControls.hidden, #innerShadowControls.hidden, #dropShadowControls.hidden { display: none; }
+
 /* ===== Main Layout ===== */
 .main-layout { display: flex; flex: 1; min-height: 0; }
 
