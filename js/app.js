@@ -430,6 +430,17 @@
     window.addEventListener('touchmove', onDragMove, { passive: false });
     window.addEventListener('mouseup', onDragEnd);
     window.addEventListener('touchend', onDragEnd);
+
+    // Mouse-wheel → scale
+    viewport.addEventListener('wheel', (e) => {
+      if (e.target.closest('.controls-panel')) return;
+      e.preventDefault();
+      const delta = e.deltaY > 0 ? -2 : 2;
+      const newVal = Math.max(+cScale.min, Math.min(+cScale.max, +cScale.value + delta));
+      cScale.value = newVal;
+      $('#scaleVal').textContent = newVal + '%';
+      applyAll();
+    }, { passive: false });
   }
   function onDragStart(e) {
     if (!cMouseCtrl.checked || cAnimHover.checked) return;
