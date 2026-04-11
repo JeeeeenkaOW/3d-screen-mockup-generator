@@ -179,9 +179,8 @@ body {
   width: 400px;
   height: 540px;
   border-radius: 12px;
-  overflow: hidden;
   background: var(--color-surface-secondary);
-  transform-style: preserve-3d;
+  transform: rotateY(0deg);
   backface-visibility: hidden;
 }
 
@@ -212,6 +211,7 @@ body {
   justify-content: center;
   overflow: hidden;
   position: relative;
+  border-radius: inherit;
 }
 .screen-image {
   display: none;
