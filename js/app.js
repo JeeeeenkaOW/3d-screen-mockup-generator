@@ -302,6 +302,11 @@
     screen_.style.width = w + 'px';
     screen_.style.height = h + 'px';
     screen_.style.borderRadius = radius + 'px';
+    // screenWrapper needs explicit size for the absolutely-positioned back face
+    screenWrapper.style.width = w + 'px';
+    screenWrapper.style.height = h + 'px';
+    // Sync back face radius
+    screenBack.style.borderRadius = radius + 'px';
     scene.style.perspective = ortho ? 'none' : persp + 'px';
 
     if (bezel > 0) {
