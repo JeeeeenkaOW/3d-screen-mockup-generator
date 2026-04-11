@@ -180,7 +180,28 @@ body {
   overflow: hidden;
   background: var(--color-surface-secondary);
   transform-style: preserve-3d;
+  backface-visibility: hidden;
 }
+
+/* Back face — sits behind .screen, flipped 180° on Y */
+.screen-back {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  border-radius: inherit;
+  overflow: hidden;
+  background: #1a1a1a;
+  transform: rotateY(180deg);
+  backface-visibility: hidden;
+  display: none; /* shown via JS when back image is loaded */
+}
+.screen-back-content {
+  width: 100%; height: 100%;
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden;
+}
+.screen-back .screen-image { display: none; width: 100%; height: 100%; object-fit: cover; }
+.screen-back .screen-image.loaded { display: block; }
 .screen-content {
   width: 100%;
   height: 100%;

@@ -14,6 +14,8 @@
   const screenGloss = $('#screenGloss');
   const screenInnerShadow = $('#screenInnerShadow');
   const screenShadow = $('#screenShadow');
+  const screenBack = $('#screenBack');
+  const backImageEl = $('#backImage');
   const uploadPrompt = $('#uploadPrompt');
   const checkerboard = $('#checkerboard');
   const dragHint = $('#dragHint');
@@ -251,6 +253,9 @@
       state.backImage = null;
       state.backImageDataURL = null;
       backImageInput.value = '';
+      backImageEl.src = '';
+      backImageEl.classList.remove('loaded');
+      screenBack.style.display = 'none';
       btnRemoveBack.classList.add('hidden');
       applyAll();
     });
@@ -308,6 +313,17 @@
       screen_.style.padding = '0';
       screen_.style.background = 'var(--color-surface-secondary, #202020)';
       screenContent.style.borderRadius = '0';
+    }
+
+    // --- Back face (turntable preview) ---
+    const isTurntable = animOn && animMode === 'turntable';
+    if (isTurntable && state.backImage) {
+      screenBack.style.display = '';
+    } else if (isTurntable) {
+      // Show dark back even without image
+      screenBack.style.display = '';
+    } else {
+      screenBack.style.display = 'none';
     }
 
     // --- Animation ---
@@ -479,6 +495,10 @@
       img.onload = () => {
         state.backImage = img;
         state.backImageDataURL = ev.target.result;
+        // Update viewport preview
+        backImageEl.src = ev.target.result;
+        backImageEl.classList.add('loaded');
+        screenBack.style.display = '';
         btnRemoveBack.classList.remove('hidden');
         applyAll();
       };
@@ -896,6 +916,9 @@
     state.bgMode = D.bgMode; state.bgColor = D.bgColor;
     state.backImage = null; state.backImageDataURL = null;
     backImageInput.value = '';
+    backImageEl.src = '';
+    backImageEl.classList.remove('loaded');
+    screenBack.style.display = 'none';
     btnRemoveBack.classList.add('hidden');
 
     $('#cornerRadiusVal').textContent = D.cornerRadius + 'px';
