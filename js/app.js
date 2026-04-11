@@ -322,11 +322,8 @@
 
     // --- Back face (turntable preview) ---
     const isTurntable = animOn && animMode === 'turntable';
-    if (isTurntable && state.backImage) {
-      screenBack.style.display = '';
-    } else if (isTurntable) {
-      // Show dark back even without image
-      screenBack.style.display = '';
+    if (isTurntable) {
+      screenBack.style.display = 'block';
     } else {
       screenBack.style.display = 'none';
     }
@@ -514,8 +511,7 @@
         // Update viewport preview
         backImageEl.src = ev.target.result;
         backImageEl.classList.add('loaded');
-        screenBack.style.display = '';
-        btnRemoveBack.classList.remove('hidden');
+        screenBack.style.display = 'block';        btnRemoveBack.classList.remove('hidden');
         applyAll();
       };
       img.src = ev.target.result;
