@@ -37,12 +37,14 @@
   const cGlossAngle = $('#glossAngle');
   const cGlossColor = $('#glossColor');
   const cGlossColorHex = $('#glossColorHex');
+  const cGlossBlend = $('#glossBlend');
 
   // Inner shadow controls
   const cInnerShadowInt = $('#innerShadowIntensity');
   const cInnerShadowAngle = $('#innerShadowAngle');
   const cInnerShadowColor = $('#innerShadowColor');
   const cInnerShadowColorHex = $('#innerShadowColorHex');
+  const cInnerShadowBlend = $('#innerShadowBlend');
 
   // Drop shadow controls
   const cShadowInt = $('#shadowIntensity');
@@ -61,6 +63,9 @@
   const animModeRow = $('#animModeRow');
   const animSpeedRow = $('#animSpeedRow');
   const animAmplitudeRow = $('#animAmplitudeRow');
+  const backImageRow = $('#backImageRow');
+  const backImageInput = $('#backImageInput');
+  const btnRemoveBack = $('#btnRemoveBack');
 
   const cExportScale = $('#exportScale');
   const fileInput = $('#fileInput');
@@ -85,14 +90,16 @@
     naturalHeight: 540,
     sourceImage: null,
     imageDataURL: null,
+    backImage: null,       // HTMLImageElement for turntable back face
+    backImageDataURL: null,
   };
 
   const DEFAULTS = {
     cornerRadius: 12, bezel: 0, bezelColor: '#1a1a1a',
     rotateX: 0, rotateY: 0, perspective: 900, scale: 80,
     mouseControl: true, orthographic: false,
-    glossIntensity: 30, glossAngle: 135, glossColor: '#ffffff',
-    innerShadowIntensity: 25, innerShadowAngle: 315, innerShadowColor: '#000000',
+    glossIntensity: 30, glossAngle: 135, glossColor: '#ffffff', glossBlend: 'normal',
+    innerShadowIntensity: 25, innerShadowAngle: 315, innerShadowColor: '#000000', innerShadowBlend: 'normal',
     shadowIntensity: 40, shadowBlur: 40, shadowOffsetX: 0, shadowOffsetY: 20,
     shadowSpread: 0, shadowColor: '#000000',
     animateHover: false, animMode: 'tilt', animSpeed: 4, animAmplitude: 12,
@@ -146,10 +153,14 @@
       bgColorSwatch.style.background = v;
     });
 
+    // Blend mode dropdowns
+    cGlossBlend.addEventListener('change', applyAll);
+    cInnerShadowBlend.addEventListener('change', applyAll);
+
     cMouseCtrl.addEventListener('change', applyAll);
     cOrtho.addEventListener('change', applyAll);
     cAnimMode.addEventListener('change', () => {
-      updateAnimAmplitudeLabel();
+      updateAnimUI();
       applyAll();
     });
 
@@ -159,7 +170,7 @@
       animSpeedRow.classList.toggle('hidden', !on);
       animAmplitudeRow.classList.toggle('hidden', !on);
       btnExportWebm.classList.toggle('hidden', !on);
-      updateAnimAmplitudeLabel();
+      updateAnimUI();
       applyAll();
     });
 
@@ -178,21 +189,33 @@
     });
     uploadPrompt.addEventListener('click', () => fileInput.click());
     btnReset.addEventListener('click', resetAll);
+
+    // Back image for turntable
+    backImageInput.addEventListener('change', (e) => {
+      if (e.target.files[0]) loadBackImage(e.target.files[0]);
+    });
+    btnRemoveBack.addEventListener('click', () => {
+      state.backImage = null;
+      state.backImageDataURL = null;
+      backImageInput.value = '';
+      btnRemoveBack.classList.add('hidden');
+      applyAll();
+    });
   }
 
-  function updateAnimAmplitudeLabel() {
+  function updateAnimUI() {
     const mode = cAnimMode.value;
+    const animOn = cAnimHover.checked;
     const label = animAmplitudeRow.querySelector('.control-label');
-    if (mode === 'breathe') {
-      label.textContent = 'Amplitude';
-      // For breathe, amplitude means % scale variance — use the same slider but interpret differently
-    } else if (mode === 'float') {
+    if (mode === 'float') {
       label.textContent = 'Distance';
-    } else if (mode === 'turntable') {
-      label.textContent = 'Amplitude';
     } else {
       label.textContent = 'Amplitude';
     }
+    // Show back image row only for turntable
+    backImageRow.classList.toggle('hidden', !(animOn && mode === 'turntable'));
+    // Hide amplitude for turntable (it does a full 360, amplitude doesn't apply)
+    animAmplitudeRow.classList.toggle('hidden', !animOn || mode === 'turntable');
   }
 
   function bindColorPair(picker, hex, extraCb) {
@@ -218,7 +241,9 @@
     const radius = +cRadius.value, bezel = +cBezel.value;
     const ortho = cOrtho.checked;
     const glossI = +cGlossInt.value / 100, glossA = +cGlossAngle.value, glossC = cGlossColor.value;
+    const glossBlend = cGlossBlend.value;
     const innerSI = +cInnerShadowInt.value / 100, innerSA = +cInnerShadowAngle.value, innerSC = cInnerShadowColor.value;
+    const innerShadowBlend = cInnerShadowBlend.value;
     const shadowI = +cShadowInt.value / 100;
     const shadowBlur = +cShadowBlur.value;
     const shadowOX = +cShadowOffsetX.value;
@@ -250,7 +275,6 @@
     }
 
     // --- Animation ---
-    // Remove all animation classes
     screenWrapper.classList.remove('anim-tilt', 'anim-float', 'anim-breathe', 'anim-turntable');
 
     if (!animOn) {
@@ -274,7 +298,7 @@
         screenWrapper.style.setProperty('--float-down', `${animAmp}px`);
         screenWrapper.classList.add('anim-float');
       } else if (animMode === 'breathe') {
-        const scaleAmp = animAmp * 0.005; // e.g. 12 → ±0.06
+        const scaleAmp = animAmp * 0.005;
         screenWrapper.style.setProperty('--breathe-scale-a', (s - scaleAmp).toFixed(4));
         screenWrapper.style.setProperty('--breathe-scale-b', (s + scaleAmp).toFixed(4));
         screenWrapper.classList.add('anim-breathe');
@@ -283,23 +307,23 @@
       }
     }
 
-    // --- Gloss (highlights) ---
+    // --- Gloss (highlights) with blend mode ---
     const gr = hexToRgb(glossC);
     screenGloss.style.background = `linear-gradient(${glossA}deg, rgba(${gr},${glossI * 0.8}) 0%, rgba(${gr},${glossI * 0.15}) 40%, rgba(0,0,0,0) 60%)`;
+    screenGloss.style.mixBlendMode = glossBlend;
 
-    // --- Inner shadow (shading — opposite direction from gloss) ---
+    // --- Inner shadow (shading) with blend mode ---
     const isr = hexToRgb(innerSC);
-    // The inner shadow gradient goes from transparent to dark — opposite feel of gloss
     screenInnerShadow.style.background = `linear-gradient(${innerSA}deg, rgba(0,0,0,0) 30%, rgba(${isr},${innerSI * 0.15}) 60%, rgba(${isr},${innerSI * 0.7}) 100%)`;
+    screenInnerShadow.style.mixBlendMode = innerShadowBlend;
 
-    // --- Drop shadow (behind the screen element via box-shadow) ---
+    // --- Drop shadow (behind the screen via box-shadow) ---
     const sr = hexToRgb(shadowC);
     if (shadowI > 0) {
       screen_.style.boxShadow = `${shadowOX}px ${shadowOY}px ${shadowBlur}px ${shadowSpr}px rgba(${sr},${shadowI})`;
     } else {
       screen_.style.boxShadow = 'none';
     }
-    // Hide the old elliptical shadow div — we use box-shadow now
     screenShadow.style.display = 'none';
 
     // --- Background ---
@@ -400,29 +424,44 @@
     reader.readAsDataURL(file);
   }
 
+  // ======== Load back image (turntable) ========
+  function loadBackImage(file) {
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const img = new Image();
+      img.onload = () => {
+        state.backImage = img;
+        state.backImageDataURL = ev.target.result;
+        btnRemoveBack.classList.remove('hidden');
+        applyAll();
+      };
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
   // ================================================================
   //  THREE.JS WEBGL EXPORT
   // ================================================================
 
-  function renderWithThreeJS(opts) {
+  /**
+   * Build a screen-face texture canvas (front or back).
+   * Draws: bezel → image → gloss → inner shadow → rounded mask.
+   * The blend mode is composited via globalCompositeOperation.
+   */
+  function buildFaceTexture(opts, sourceImg) {
     const {
-      rotX, rotY, perspDist, scale, ortho,
       cornerRadius, bezel, bezelColor,
-      glossIntensity, glossAngle, glossColor,
-      innerShadowIntensity, innerShadowAngle, innerShadowColor,
-      shadowIntensity, shadowBlur, shadowOffsetX, shadowOffsetY, shadowSpread,
-      shadowColor,
-      bgMode, bgColor, exportScale,
-      screenW, screenH,
+      glossIntensity, glossAngle, glossColor, glossBlend,
+      innerShadowIntensity, innerShadowAngle, innerShadowColor, innerShadowBlend,
+      exportScale, screenW, screenH,
     } = opts;
 
     const totalW = screenW + bezel * 2;
     const totalH = screenH + bezel * 2;
-
-    // --- Create a rounded-rect texture for the screen ---
-    const texCanvas = document.createElement('canvas');
     const texW = totalW * exportScale;
     const texH = totalH * exportScale;
+    const texCanvas = document.createElement('canvas');
     texCanvas.width = texW;
     texCanvas.height = texH;
     const tctx = texCanvas.getContext('2d');
@@ -441,11 +480,11 @@
     const imgH = screenH * exportScale;
     const innerR = bezel > 0 ? Math.max(0, cornerRadius - bezel) * exportScale : cornerRadius * exportScale;
 
-    if (state.sourceImage) {
+    if (sourceImg) {
       tctx.save();
       roundRect(tctx, imgX, imgY, imgW, imgH, innerR);
       tctx.clip();
-      tctx.drawImage(state.sourceImage, imgX, imgY, imgW, imgH);
+      tctx.drawImage(sourceImg, imgX, imgY, imgW, imgH);
       tctx.restore();
     } else {
       roundRect(tctx, imgX, imgY, imgW, imgH, innerR);
@@ -453,11 +492,15 @@
       tctx.fill();
     }
 
+    // Helper: map CSS blend mode name → canvas globalCompositeOperation
+    const blendMap = { normal: 'source-over', multiply: 'multiply', screen: 'screen' };
+
     // Gloss overlay (highlights)
     if (glossIntensity > 0) {
       tctx.save();
       roundRect(tctx, 0, 0, texW, texH, cornerRadius * exportScale);
       tctx.clip();
+      tctx.globalCompositeOperation = blendMap[glossBlend] || 'source-over';
       const rad = (glossAngle * Math.PI) / 180;
       const cx = texW / 2, cy = texH / 2;
       const diag = Math.hypot(texW, texH) / 2;
@@ -474,11 +517,12 @@
       tctx.restore();
     }
 
-    // Inner shadow overlay (shading — opposite of gloss)
+    // Inner shadow overlay (shading)
     if (innerShadowIntensity > 0) {
       tctx.save();
       roundRect(tctx, 0, 0, texW, texH, cornerRadius * exportScale);
       tctx.clip();
+      tctx.globalCompositeOperation = blendMap[innerShadowBlend] || 'source-over';
       const rad = (innerShadowAngle * Math.PI) / 180;
       const cx = texW / 2, cy = texH / 2;
       const diag = Math.hypot(texW, texH) / 2;
@@ -495,7 +539,8 @@
       tctx.restore();
     }
 
-    // Alpha mask the rounded rect
+    // Alpha mask to rounded rect
+    tctx.globalCompositeOperation = 'destination-in';
     const maskCanvas = document.createElement('canvas');
     maskCanvas.width = texW;
     maskCanvas.height = texH;
@@ -503,12 +548,50 @@
     roundRect(mctx, 0, 0, texW, texH, cornerRadius * exportScale);
     mctx.fillStyle = '#fff';
     mctx.fill();
-    tctx.globalCompositeOperation = 'destination-in';
     tctx.drawImage(maskCanvas, 0, 0);
     tctx.globalCompositeOperation = 'source-over';
 
+    return texCanvas;
+  }
+
+  function renderWithThreeJS(opts) {
+    const {
+      rotX, rotY, perspDist, scale, ortho,
+      cornerRadius, bezel,
+      shadowIntensity, shadowBlur, shadowOffsetX, shadowOffsetY, shadowSpread,
+      shadowColor,
+      bgMode, bgColor, exportScale,
+      screenW, screenH,
+    } = opts;
+
+    const totalW = screenW + bezel * 2;
+    const totalH = screenH + bezel * 2;
+    const texW = totalW * exportScale;
+    const texH = totalH * exportScale;
+
+    // Build front face texture
+    const frontCanvas = buildFaceTexture(opts, state.sourceImage);
+
+    // Build back face texture (used in turntable, or solid dark fallback)
+    let backCanvas = null;
+    const isTurntable = cAnimHover.checked && cAnimMode.value === 'turntable';
+    if (isTurntable || Math.abs(rotY) > 90) {
+      const backImg = state.backImage || null;
+      if (backImg) {
+        backCanvas = buildFaceTexture(opts, backImg);
+      } else {
+        // Solid dark back with rounded corners
+        backCanvas = document.createElement('canvas');
+        backCanvas.width = texW;
+        backCanvas.height = texH;
+        const bctx = backCanvas.getContext('2d');
+        roundRect(bctx, 0, 0, texW, texH, cornerRadius * exportScale);
+        bctx.fillStyle = '#1a1a1a';
+        bctx.fill();
+      }
+    }
+
     // --- Three.js scene ---
-    // Add enough padding for drop shadow
     const padX = (Math.abs(shadowOffsetX) + shadowBlur + Math.abs(shadowSpread)) * exportScale + 60 * exportScale;
     const padY = (Math.abs(shadowOffsetY) + shadowBlur + Math.abs(shadowSpread)) * exportScale + 60 * exportScale;
     const viewW = Math.ceil(totalW * scale * exportScale + padX * 2);
@@ -541,20 +624,18 @@
     }
     camera.lookAt(0, 0, 0);
 
-    // --- Drop shadow: render as a blurred rectangle behind the screen ---
+    // --- Drop shadow ---
     if (shadowIntensity > 0) {
       const sSW = texW + shadowSpread * 2 * exportScale;
       const sSH = texH + shadowSpread * 2 * exportScale;
       const shadowCanvas = document.createElement('canvas');
       const sBlur = shadowBlur * exportScale;
-      // Canvas needs extra room for blur
       const sCanvW = Math.ceil(sSW + sBlur * 4);
       const sCanvH = Math.ceil(sSH + sBlur * 4);
       shadowCanvas.width = sCanvW;
       shadowCanvas.height = sCanvH;
       const sctx = shadowCanvas.getContext('2d');
 
-      // Draw a rounded rect for the shadow shape, blurred
       sctx.filter = `blur(${sBlur}px)`;
       const scRgb = hexToRgb(shadowColor);
       sctx.fillStyle = `rgba(${scRgb},${shadowIntensity})`;
@@ -569,39 +650,50 @@
       const shadowGeo = new THREE.PlaneGeometry(sCanvW, sCanvH);
       const shadowMat = new THREE.MeshBasicMaterial({ map: shadowTex, transparent: true, depthWrite: false });
       const shadowMesh = new THREE.Mesh(shadowGeo, shadowMat);
-
-      // Position: offset relative to screen center, slightly behind
-      shadowMesh.position.set(
-        shadowOffsetX * exportScale * scale,
-        -shadowOffsetY * exportScale * scale,
-        -1
-      );
+      shadowMesh.position.set(shadowOffsetX * exportScale * scale, -shadowOffsetY * exportScale * scale, -1);
       shadowMesh.scale.set(scale, scale, 1);
       shadowMesh.renderOrder = -1;
       threeScene.add(shadowMesh);
     }
 
-    // --- Screen plane ---
-    const tex = new THREE.CanvasTexture(texCanvas);
-    tex.minFilter = THREE.LinearFilter;
-    tex.magFilter = THREE.LinearFilter;
+    // --- Front face ---
+    const frontTex = new THREE.CanvasTexture(frontCanvas);
+    frontTex.minFilter = THREE.LinearFilter;
+    frontTex.magFilter = THREE.LinearFilter;
 
     const geo = new THREE.PlaneGeometry(texW, texH);
-    const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, side: THREE.DoubleSide });
-    const mesh = new THREE.Mesh(geo, mat);
+    const frontMat = new THREE.MeshBasicMaterial({ map: frontTex, transparent: true, side: THREE.FrontSide });
+    const frontMesh = new THREE.Mesh(geo, frontMat);
 
-    mesh.rotation.x = -(rotX * Math.PI) / 180;
-    mesh.rotation.y = (rotY * Math.PI) / 180;
-    mesh.scale.set(scale, scale, scale);
+    frontMesh.rotation.x = -(rotX * Math.PI) / 180;
+    frontMesh.rotation.y = (rotY * Math.PI) / 180;
+    frontMesh.scale.set(scale, scale, scale);
+    threeScene.add(frontMesh);
 
-    threeScene.add(mesh);
+    // --- Back face (separate plane, slightly behind, flipped) ---
+    if (backCanvas) {
+      const backTex = new THREE.CanvasTexture(backCanvas);
+      backTex.minFilter = THREE.LinearFilter;
+      backTex.magFilter = THREE.LinearFilter;
+
+      const backGeo = new THREE.PlaneGeometry(texW, texH);
+      const backMat = new THREE.MeshBasicMaterial({ map: backTex, transparent: true, side: THREE.FrontSide });
+      const backMesh = new THREE.Mesh(backGeo, backMat);
+
+      // Position exactly at the same place as front, rotated 180° around Y
+      // so it faces the opposite direction
+      backMesh.rotation.x = -(rotX * Math.PI) / 180;
+      backMesh.rotation.y = (rotY * Math.PI) / 180 + Math.PI;
+      backMesh.scale.set(scale, scale, scale);
+      threeScene.add(backMesh);
+    }
 
     renderer.render(threeScene, camera);
     const outCanvas = renderer.domElement;
 
     renderer.dispose();
-    tex.dispose();
-    mat.dispose();
+    frontTex.dispose();
+    frontMat.dispose();
     geo.dispose();
 
     return outCanvas;
@@ -635,9 +727,11 @@
       glossIntensity: +cGlossInt.value / 100,
       glossAngle: +cGlossAngle.value,
       glossColor: cGlossColor.value,
+      glossBlend: cGlossBlend.value,
       innerShadowIntensity: +cInnerShadowInt.value / 100,
       innerShadowAngle: +cInnerShadowAngle.value,
       innerShadowColor: cInnerShadowColor.value,
+      innerShadowBlend: cInnerShadowBlend.value,
       shadowIntensity: +cShadowInt.value / 100,
       shadowBlur: +cShadowBlur.value,
       shadowOffsetX: +cShadowOffsetX.value,
@@ -682,32 +776,13 @@
     const angle = t * Math.PI * 2;
     switch (mode) {
       case 'tilt':
-        return {
-          rx: rx + Math.sin(angle) * (amp / 2),
-          ry: ry + Math.cos(angle) * amp,
-          s: s,
-        };
+        return { rx: rx + Math.sin(angle) * (amp / 2), ry: ry + Math.cos(angle) * amp, s: s };
       case 'float':
-        // Float: translateY is baked into rotX offset for 3D export (small approximation)
-        // Actually we shift the mesh position in Y
-        return {
-          rx: rx,
-          ry: ry,
-          s: s,
-          translateY: Math.sin(angle) * amp,
-        };
+        return { rx: rx, ry: ry, s: s, translateY: Math.sin(angle) * amp };
       case 'breathe':
-        return {
-          rx: rx,
-          ry: ry,
-          s: s + Math.sin(angle) * (amp * 0.005),
-        };
+        return { rx: rx, ry: ry, s: s + Math.sin(angle) * (amp * 0.005) };
       case 'turntable':
-        return {
-          rx: rx,
-          ry: t * 360,
-          s: s,
-        };
+        return { rx: rx, ry: t * 360, s: s };
       default:
         return { rx, ry, s };
     }
@@ -731,7 +806,6 @@
       const s = +cScale.value / 100;
       const amp = +cAnimAmplitude.value;
 
-      // Render first frame to get dimensions
       const frame0 = getAnimFrame(0, mode, rx, ry, s, amp);
       const firstCanvas = renderWithThreeJS(gatherOpts(frame0.rx, frame0.ry, frame0.s));
       const recCanvas = document.createElement('canvas');
@@ -799,9 +873,11 @@
     cMouseCtrl.checked = D.mouseControl; cOrtho.checked = D.orthographic;
     cGlossInt.value = D.glossIntensity; cGlossAngle.value = D.glossAngle;
     cGlossColor.value = D.glossColor; cGlossColorHex.value = D.glossColor;
+    cGlossBlend.value = D.glossBlend;
     cInnerShadowInt.value = D.innerShadowIntensity;
     cInnerShadowAngle.value = D.innerShadowAngle;
     cInnerShadowColor.value = D.innerShadowColor; cInnerShadowColorHex.value = D.innerShadowColor;
+    cInnerShadowBlend.value = D.innerShadowBlend;
     cShadowInt.value = D.shadowIntensity;
     cShadowBlur.value = D.shadowBlur;
     cShadowOffsetX.value = D.shadowOffsetX;
@@ -814,6 +890,9 @@
     cAnimAmplitude.value = D.animAmplitude;
     cExportScale.value = D.exportScale;
     state.bgMode = D.bgMode; state.bgColor = D.bgColor;
+    state.backImage = null; state.backImageDataURL = null;
+    backImageInput.value = '';
+    btnRemoveBack.classList.add('hidden');
 
     $('#cornerRadiusVal').textContent = D.cornerRadius + 'px';
     $('#bezelVal').textContent = D.bezel + 'px';
@@ -843,6 +922,7 @@
     animModeRow.classList.add('hidden');
     animSpeedRow.classList.add('hidden');
     animAmplitudeRow.classList.add('hidden');
+    backImageRow.classList.add('hidden');
     btnExportWebm.classList.add('hidden');
 
     applyAll();

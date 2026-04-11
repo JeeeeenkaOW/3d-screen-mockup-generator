@@ -112,6 +112,7 @@ body {
 }
 
 .upload-btn-wrap { cursor: pointer; }
+.back-image-controls { display: flex; flex-direction: column; gap: var(--space-200); }
 
 /* ===== Main Layout ===== */
 .main-layout { display: flex; flex: 1; min-height: 0; }
