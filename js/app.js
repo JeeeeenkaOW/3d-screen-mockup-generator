@@ -13,6 +13,7 @@
   const screenImage = $('#screenImage');
   const screenGloss = $('#screenGloss');
   const screenInnerShadow = $('#screenInnerShadow');
+  const screenChamfer = $('#screenChamfer');
   const screenShadow = $('#screenShadow');
   const screenBack = $('#screenBack');
   const backImageEl = $('#backImage');
@@ -29,6 +30,7 @@
   const cBezel = $('#bezel');
   const cBezelColor = $('#bezelColor');
   const cBezelColorHex = $('#bezelColorHex');
+  const cEdgeDepth = $('#edgeDepth');
   const cRotX = $('#rotateX');
   const cRotY = $('#rotateY');
   const cPerspective = $('#perspective');
@@ -104,46 +106,70 @@
     backImageDataURL: null,
   };
 
-  const DEFAULTS = {
-    cornerRadius: 12, bezel: 0, bezelColor: '#1a1a1a',
-    rotateX: 0, rotateY: 0, perspective: 900, scale: 80,
-    mouseControl: true, orthographic: false,
-    glossEnabled: false, glossIntensity: 30, glossAngle: 135, glossColor: '#ffffff', glossBlend: 'normal',
-    innerShadowEnabled: false, innerShadowIntensity: 25, innerShadowAngle: 315, innerShadowColor: '#000000', innerShadowBlend: 'normal',
-    dropShadowEnabled: false, shadowIntensity: 40, shadowBlur: 40, shadowOffsetX: 0, shadowOffsetY: 20,
-    shadowSpread: 0, shadowColor: '#000000',
-    animateHover: false, animMode: 'tilt', animSpeed: 4, animAmplitude: 12,
-    exportScale: 2, bgMode: 'transparent', bgColor: '#000000',
+  // ============================================================
+  //  DEFAULTS — organized by section for per-section reset
+  // ============================================================
+  const SECTION_DEFAULTS = {
+    shape: {
+      cornerRadius: 12,
+      bezel: 0,
+      bezelColor: '#1a1a1a',
+      edgeDepth: 0,
+    },
+    angle: {
+      rotateX: 0,
+      rotateY: 0,
+      perspective: 900,
+      scale: 80,
+      mouseControl: true,
+      orthographic: false,
+    },
+    gloss: {
+      glossEnabled: false,
+      glossIntensity: 30,
+      glossAngle: 135,
+      glossColor: '#ffffff',
+      glossBlend: 'normal',
+    },
+    innerShadow: {
+      innerShadowEnabled: false,
+      innerShadowIntensity: 25,
+      innerShadowAngle: 315,
+      innerShadowColor: '#000000',
+      innerShadowBlend: 'normal',
+    },
+    dropShadow: {
+      dropShadowEnabled: false,
+      shadowIntensity: 40,
+      shadowBlur: 40,
+      shadowOffsetX: 0,
+      shadowOffsetY: 20,
+      shadowSpread: 0,
+      shadowColor: '#000000',
+    },
+    background: {
+      bgMode: 'transparent',
+      bgColor: '#000000',
+    },
+    animation: {
+      animateHover: false,
+      animMode: 'tilt',
+      animSpeed: 4,
+      animAmplitude: 12,
+    },
   };
 
+  // Flat defaults map — combined from all sections
+  const DEFAULTS = Object.assign({ exportScale: 2 },
+    ...Object.values(SECTION_DEFAULTS));
+
   /**
-   * Convert CSS gradient angle to canvas angle.
-   * CSS: 0° = to top (↑), 90° = to right (→), clockwise.
-   * Canvas: 0° = to right (→), increases counter-clockwise in standard math.
-   * We need the gradient start→end line direction.
-   * CSS angle A means the gradient line points at A degrees from north, clockwise.
-   * In canvas coords (y-down): direction angle = (A - 90)° converted to radians,
-   * but we measure from the positive x-axis.
-   * Actually: CSS angle A → canvas direction = (90 - A) degrees → convert to radians.
-   * Wait, let me think more carefully.
-   * CSS linear-gradient(135deg, ...) goes from top-left to bottom-right.
-   * In canvas, to replicate: start at top-left, end at bottom-right.
-   * The formula: canvas_radians = (A - 90) * PI / 180, where A is CSS degrees.
-   * Then: start = center - cos/sin * diagonal, end = center + cos/sin * diagonal.
-   * But canvas y-axis is inverted (down = positive).
-   * So: dx = sin(A_rad), dy = -cos(A_rad) where A_rad = A * PI/180 (CSS convention).
-   * This gives us the gradient direction vector in canvas coords.
+   * Convert CSS gradient angle to canvas gradient endpoints.
+   * CSS 0deg = to top, 90deg = to right, clockwise.
+   * Canvas y-axis is down, so: dx = sin(A), dy = -cos(A) matches CSS behavior.
    */
   function cssAngleToCanvasGradient(cssDeg, cx, cy, halfDiag) {
     const rad = (cssDeg * Math.PI) / 180;
-    // CSS gradient direction: (sin(A), -cos(A)) but in canvas y-down: (sin(A), cos(A)) wait...
-    // CSS 0° = bottom-to-top, 90° = left-to-right, 180° = top-to-bottom
-    // Actually no — CSS spec: 0deg = to top, angles go clockwise.
-    // Direction vector in CSS coords: (sin(A), -cos(A)) ... but CSS y-axis goes DOWN on screen.
-    // In canvas (y-down): direction = (sin(A), -cos(A)) still holds because CSS y also goes down.
-    // Wait, CSS 0° goes upward = (0, -1) in screen coords. sin(0)=0, -cos(0)=-1. Correct.
-    // CSS 90° goes right = (1, 0). sin(90)=1, -cos(90)=0. Correct.
-    // CSS 135° goes bottom-right = (sin135, -cos135) = (0.707, 0.707). Correct.
     const dx = Math.sin(rad);
     const dy = -Math.cos(rad);
     return {
@@ -160,6 +186,7 @@
     bindDragRotate();
     bindFileDrop();
     bindExport();
+    bindSectionResets();
     applyAll();
   }
 
@@ -168,6 +195,7 @@
     const sliders = [
       [cRadius, 'cornerRadiusVal', 'px'],
       [cBezel, 'bezelVal', 'px'],
+      [cEdgeDepth, 'edgeDepthVal', 'px'],
       [cRotX, 'rotateXVal', '°'],
       [cRotY, 'rotateYVal', '°'],
       [cPerspective, 'perspectiveVal', ''],
@@ -201,11 +229,9 @@
       bgColorSwatch.style.background = v;
     });
 
-    // Blend mode dropdowns
     cGlossBlend.addEventListener('change', applyAll);
     cInnerShadowBlend.addEventListener('change', applyAll);
 
-    // Section toggles
     cGlossEnabled.addEventListener('change', () => {
       glossControls.classList.toggle('hidden', !cGlossEnabled.checked);
       applyAll();
@@ -247,7 +273,6 @@
     uploadPrompt.addEventListener('click', () => fileInput.click());
     btnReset.addEventListener('click', resetAll);
 
-    // Back image for turntable
     backImageInput.addEventListener('change', (e) => { if (e.target.files[0]) loadBackImage(e.target.files[0]); });
     btnRemoveBack.addEventListener('click', () => {
       state.backImage = null;
@@ -286,11 +311,95 @@
     });
   }
 
+  // ======== Per-section resets ========
+  function bindSectionResets() {
+    document.querySelectorAll('.panel-reset[data-reset]').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const sectionKey = btn.dataset.reset;
+        resetSection(sectionKey);
+      });
+    });
+  }
+
+  function resetSection(key) {
+    const defaults = SECTION_DEFAULTS[key];
+    if (!defaults) return;
+
+    // Map of default-key -> {setter, valueId?, suffix?}
+    // This keeps reset logic symmetric with the UI wiring.
+    const appliers = {
+      // Shape
+      cornerRadius: (v) => { cRadius.value = v; $('#cornerRadiusVal').textContent = v + 'px'; },
+      bezel:        (v) => { cBezel.value = v; $('#bezelVal').textContent = v + 'px'; },
+      bezelColor:   (v) => { cBezelColor.value = v; cBezelColorHex.value = v; },
+      edgeDepth:    (v) => { cEdgeDepth.value = v; $('#edgeDepthVal').textContent = v + 'px'; },
+      // Angle
+      rotateX:      (v) => { cRotX.value = v; $('#rotateXVal').textContent = v + '°'; },
+      rotateY:      (v) => { cRotY.value = v; $('#rotateYVal').textContent = v + '°'; },
+      perspective:  (v) => { cPerspective.value = v; $('#perspectiveVal').textContent = v; },
+      scale:        (v) => { cScale.value = v; $('#scaleVal').textContent = v + '%'; },
+      mouseControl: (v) => { cMouseCtrl.checked = v; },
+      orthographic: (v) => { cOrtho.checked = v; },
+      // Gloss
+      glossEnabled:   (v) => { cGlossEnabled.checked = v; glossControls.classList.toggle('hidden', !v); },
+      glossIntensity: (v) => { cGlossInt.value = v; $('#glossIntensityVal').textContent = v + '%'; },
+      glossAngle:     (v) => { cGlossAngle.value = v; $('#glossAngleVal').textContent = v + '°'; },
+      glossColor:     (v) => { cGlossColor.value = v; cGlossColorHex.value = v; },
+      glossBlend:     (v) => { cGlossBlend.value = v; },
+      // Inner shadow
+      innerShadowEnabled:   (v) => { cInnerShadowEnabled.checked = v; innerShadowControls.classList.toggle('hidden', !v); },
+      innerShadowIntensity: (v) => { cInnerShadowInt.value = v; $('#innerShadowIntensityVal').textContent = v + '%'; },
+      innerShadowAngle:     (v) => { cInnerShadowAngle.value = v; $('#innerShadowAngleVal').textContent = v + '°'; },
+      innerShadowColor:     (v) => { cInnerShadowColor.value = v; cInnerShadowColorHex.value = v; },
+      innerShadowBlend:     (v) => { cInnerShadowBlend.value = v; },
+      // Drop shadow
+      dropShadowEnabled: (v) => { cDropShadowEnabled.checked = v; dropShadowControls.classList.toggle('hidden', !v); },
+      shadowIntensity:   (v) => { cShadowInt.value = v; $('#shadowIntensityVal').textContent = v + '%'; },
+      shadowBlur:        (v) => { cShadowBlur.value = v; $('#shadowBlurVal').textContent = v + 'px'; },
+      shadowOffsetX:     (v) => { cShadowOffsetX.value = v; $('#shadowOffsetXVal').textContent = v + 'px'; },
+      shadowOffsetY:     (v) => { cShadowOffsetY.value = v; $('#shadowOffsetYVal').textContent = v + 'px'; },
+      shadowSpread:      (v) => { cShadowSpread.value = v; $('#shadowSpreadVal').textContent = v + 'px'; },
+      shadowColor:       (v) => { cShadowColor.value = v; cShadowColorHex.value = v; },
+      // Background
+      bgMode:  (v) => {
+        state.bgMode = v;
+        bgButtons.forEach((b) => b.classList.toggle('active', b.dataset.bg === v));
+        bgColorPickerRow.classList.toggle('hidden', v !== 'color');
+      },
+      bgColor: (v) => {
+        state.bgColor = v;
+        bgColorPicker.value = v; bgColorHex.value = v; bgColorSwatch.style.background = v;
+      },
+      // Animation
+      animateHover: (v) => {
+        cAnimHover.checked = v;
+        animModeRow.classList.toggle('hidden', !v);
+        animSpeedRow.classList.toggle('hidden', !v);
+        animAmplitudeRow.classList.toggle('hidden', !v);
+        btnExportWebm.classList.toggle('hidden', !v);
+      },
+      animMode:      (v) => { cAnimMode.value = v; },
+      animSpeed:     (v) => { cAnimSpeed.value = v; $('#animSpeedVal').textContent = v + 's'; },
+      animAmplitude: (v) => { cAnimAmplitude.value = v; $('#animAmplitudeVal').textContent = v + '°'; },
+    };
+
+    Object.entries(defaults).forEach(([k, v]) => {
+      if (appliers[k]) appliers[k](v);
+    });
+
+    // Animation reset needs a second pass to update the amplitude label (float vs tilt etc.)
+    if (key === 'animation') updateAnimUI();
+
+    applyAll();
+  }
+
   // ======== Apply (CSS live preview) ========
   function applyAll() {
     const rx = +cRotX.value, ry = +cRotY.value;
     const persp = +cPerspective.value, s = +cScale.value / 100;
     const radius = +cRadius.value, bezel = +cBezel.value;
+    const edgeDepth = +cEdgeDepth.value;
     const ortho = cOrtho.checked;
     const bezelC = cBezelColor.value;
     const animOn = cAnimHover.checked;
@@ -302,10 +411,8 @@
     screen_.style.width = w + 'px';
     screen_.style.height = h + 'px';
     screen_.style.borderRadius = radius + 'px';
-    // screenWrapper needs explicit size for the absolutely-positioned back face
     screenWrapper.style.width = w + 'px';
     screenWrapper.style.height = h + 'px';
-    // Sync back face radius
     screenBack.style.borderRadius = radius + 'px';
     scene.style.perspective = ortho ? 'none' : persp + 'px';
 
@@ -320,15 +427,26 @@
       screenContent.style.borderRadius = '0';
     }
 
-    // --- Back face (turntable preview) ---
-    const isTurntable = animOn && animMode === 'turntable';
-    if (isTurntable) {
-      screenBack.style.display = 'block';
+    // --- Chamfer preview (layered inset shadows to fake a bevel) ---
+    // Top/left inset highlight + bottom/right inset shadow = cheap faux bevel.
+    // Export path renders real ExtrudeGeometry with bevel + lighting.
+    if (edgeDepth > 0) {
+      const highlightSize = Math.max(1, Math.round(edgeDepth * 0.6));
+      const shadowSize = Math.max(1, Math.round(edgeDepth * 0.6));
+      screenChamfer.style.display = 'block';
+      screenChamfer.style.boxShadow = [
+        `inset ${highlightSize}px ${highlightSize}px ${highlightSize * 1.5}px rgba(255,255,255,0.35)`,
+        `inset -${shadowSize}px -${shadowSize}px ${shadowSize * 1.5}px rgba(0,0,0,0.45)`,
+      ].join(', ');
     } else {
-      screenBack.style.display = 'none';
+      screenChamfer.style.display = 'none';
+      screenChamfer.style.boxShadow = 'none';
     }
 
-    // --- Animation ---
+    const isTurntable = animOn && animMode === 'turntable';
+    screenBack.style.display = isTurntable ? 'block' : 'none';
+
+    // --- Animation (CSS) ---
     screenWrapper.classList.remove('anim-tilt', 'anim-float', 'anim-breathe', 'anim-turntable');
     if (!animOn) {
       screenWrapper.style.transform = `rotateX(${rx}deg) rotateY(${ry}deg) scale(${s})`;
@@ -396,21 +514,21 @@
     screenShadow.style.display = 'none';
 
     // --- Background ---
+    // CRITICAL FIX: do NOT set background on .capture-area. It lives inside
+    // a preserve-3d container and becomes a competing plane in 3D space,
+    // causing the back half of the rotated screen to get clipped/hidden.
     switch (state.bgMode) {
       case 'transparent':
         checkerboard.style.display = '';
         viewport.style.background = '';
-        captureArea.style.background = 'transparent';
         break;
       case 'color':
         checkerboard.style.display = 'none';
         viewport.style.background = state.bgColor;
-        captureArea.style.background = state.bgColor;
         break;
       case 'greenscreen':
         checkerboard.style.display = 'none';
         viewport.style.background = '#00FF00';
-        captureArea.style.background = '#00FF00';
         break;
     }
   }
@@ -428,7 +546,6 @@
     window.addEventListener('mouseup', onDragEnd);
     window.addEventListener('touchend', onDragEnd);
 
-    // Mouse-wheel → scale
     viewport.addEventListener('wheel', (e) => {
       if (e.target.closest('.controls-panel')) return;
       e.preventDefault();
@@ -508,10 +625,10 @@
       img.onload = () => {
         state.backImage = img;
         state.backImageDataURL = ev.target.result;
-        // Update viewport preview
         backImageEl.src = ev.target.result;
         backImageEl.classList.add('loaded');
-        screenBack.style.display = 'block';        btnRemoveBack.classList.remove('hidden');
+        screenBack.style.display = 'block';
+        btnRemoveBack.classList.remove('hidden');
         applyAll();
       };
       img.src = ev.target.result;
@@ -523,9 +640,6 @@
   //  THREE.JS WEBGL EXPORT
   // ================================================================
 
-  /**
-   * Build a screen-face texture canvas (front or back).
-   */
   function buildFaceTexture(opts, sourceImg) {
     const {
       cornerRadius, bezel, bezelColor,
@@ -543,14 +657,12 @@
     texCanvas.height = texH;
     const tctx = texCanvas.getContext('2d');
 
-    // Bezel
     if (bezel > 0) {
       roundRect(tctx, 0, 0, texW, texH, cornerRadius * exportScale);
       tctx.fillStyle = bezelColor;
       tctx.fill();
     }
 
-    // Image
     const imgX = bezel * exportScale, imgY = bezel * exportScale;
     const imgW = screenW * exportScale, imgH = screenH * exportScale;
     const innerR = bezel > 0 ? Math.max(0, cornerRadius - bezel) * exportScale : cornerRadius * exportScale;
@@ -571,7 +683,6 @@
     const cx = texW / 2, cy = texH / 2;
     const halfDiag = Math.hypot(texW, texH) / 2;
 
-    // Gloss
     if (glossEnabled && glossIntensity > 0) {
       tctx.save();
       roundRect(tctx, 0, 0, texW, texH, cornerRadius * exportScale);
@@ -588,7 +699,6 @@
       tctx.restore();
     }
 
-    // Inner shadow
     if (innerShadowEnabled && innerShadowIntensity > 0) {
       tctx.save();
       roundRect(tctx, 0, 0, texW, texH, cornerRadius * exportScale);
@@ -605,7 +715,6 @@
       tctx.restore();
     }
 
-    // Alpha mask
     tctx.globalCompositeOperation = 'destination-in';
     const maskCanvas = document.createElement('canvas');
     maskCanvas.width = texW; maskCanvas.height = texH;
@@ -619,10 +728,30 @@
     return texCanvas;
   }
 
+  /**
+   * Build a rounded-rect Three.Shape for ExtrudeGeometry.
+   * Centers the shape at origin.
+   */
+  function buildRoundedRectShape(w, h, r) {
+    r = Math.min(r, w / 2, h / 2);
+    const shape = new THREE.Shape();
+    const x = -w / 2, y = -h / 2;
+    shape.moveTo(x + r, y);
+    shape.lineTo(x + w - r, y);
+    shape.quadraticCurveTo(x + w, y, x + w, y + r);
+    shape.lineTo(x + w, y + h - r);
+    shape.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    shape.lineTo(x + r, y + h);
+    shape.quadraticCurveTo(x, y + h, x, y + h - r);
+    shape.lineTo(x, y + r);
+    shape.quadraticCurveTo(x, y, x + r, y);
+    return shape;
+  }
+
   function renderWithThreeJS(opts) {
     const {
       rotX, rotY, perspDist, scale, ortho,
-      cornerRadius, bezel,
+      cornerRadius, bezel, bezelColor, edgeDepth,
       dropShadowEnabled, shadowIntensity, shadowBlur, shadowOffsetX, shadowOffsetY, shadowSpread, shadowColor,
       bgMode, bgColor, exportScale,
       screenW, screenH, hasBackImage,
@@ -633,15 +762,12 @@
     const texW = totalW * exportScale;
     const texH = totalH * exportScale;
 
-    // Build front texture
     const frontCanvas = buildFaceTexture(opts, state.sourceImage);
 
-    // Build back texture: use back image if provided, otherwise dark solid
-    let backCanvas = null;
+    let backCanvas;
     if (hasBackImage && state.backImage) {
       backCanvas = buildFaceTexture(opts, state.backImage);
     } else {
-      // Solid dark back
       backCanvas = document.createElement('canvas');
       backCanvas.width = texW; backCanvas.height = texH;
       const bctx = backCanvas.getContext('2d');
@@ -650,10 +776,11 @@
       bctx.fill();
     }
 
-    // Scene sizing
+    const depthPx = edgeDepth * exportScale;
+    const extraPadForDepth = depthPx * Math.max(1, Math.abs(Math.sin(rotY * Math.PI / 180))) + 20;
     const pad = dropShadowEnabled
-      ? (Math.abs(shadowOffsetX) + shadowBlur + Math.abs(shadowSpread)) * exportScale + 60 * exportScale
-      : 60 * exportScale;
+      ? (Math.abs(shadowOffsetX) + shadowBlur + Math.abs(shadowSpread)) * exportScale + 60 * exportScale + extraPadForDepth
+      : 60 * exportScale + extraPadForDepth;
     const viewW = Math.ceil(totalW * scale * exportScale + pad * 2);
     const viewH = Math.ceil(totalH * scale * exportScale + pad * 2);
 
@@ -679,7 +806,19 @@
     }
     camera.lookAt(0, 0, 0);
 
-    // Drop shadow
+    // Lights — needed for chamfered edge to catch highlights
+    if (edgeDepth > 0) {
+      const ambient = new THREE.AmbientLight(0xffffff, 0.85);
+      threeScene.add(ambient);
+      const keyLight = new THREE.DirectionalLight(0xffffff, 0.9);
+      keyLight.position.set(-200, 300, 500);
+      threeScene.add(keyLight);
+      const fillLight = new THREE.DirectionalLight(0xffffff, 0.25);
+      fillLight.position.set(300, -200, 400);
+      threeScene.add(fillLight);
+    }
+
+    // Drop shadow (unchanged)
     if (dropShadowEnabled && shadowIntensity > 0) {
       const sSW = texW + shadowSpread * 2 * exportScale;
       const sSH = texH + shadowSpread * 2 * exportScale;
@@ -699,40 +838,173 @@
         new THREE.PlaneGeometry(sCanvW, sCanvH),
         new THREE.MeshBasicMaterial({ map: shadowTex, transparent: true, depthWrite: false })
       );
-      shadowMesh.position.set(shadowOffsetX * exportScale * scale, -shadowOffsetY * exportScale * scale, -1);
+      shadowMesh.position.set(shadowOffsetX * exportScale * scale, -shadowOffsetY * exportScale * scale, -1 - depthPx);
       shadowMesh.scale.set(scale, scale, 1);
       shadowMesh.renderOrder = -1;
       threeScene.add(shadowMesh);
     }
 
-    // Front face
     const frontTex = new THREE.CanvasTexture(frontCanvas);
-    frontTex.minFilter = THREE.LinearFilter; frontTex.magFilter = THREE.LinearFilter;
-    const geo = new THREE.PlaneGeometry(texW, texH);
-    const frontMesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map: frontTex, transparent: true, side: THREE.FrontSide }));
-    frontMesh.rotation.x = -(rotX * Math.PI) / 180;
-    frontMesh.rotation.y = (rotY * Math.PI) / 180;
-    frontMesh.scale.set(scale, scale, scale);
-    threeScene.add(frontMesh);
+    frontTex.minFilter = THREE.LinearFilter;
+    frontTex.magFilter = THREE.LinearFilter;
+    const backTex = new THREE.CanvasTexture(backCanvas);
+    backTex.minFilter = THREE.LinearFilter;
+    backTex.magFilter = THREE.LinearFilter;
 
-    // Back face
-    if (backCanvas) {
-      const backTex = new THREE.CanvasTexture(backCanvas);
-      backTex.minFilter = THREE.LinearFilter; backTex.magFilter = THREE.LinearFilter;
-      const backMesh = new THREE.Mesh(
-        new THREE.PlaneGeometry(texW, texH),
-        new THREE.MeshBasicMaterial({ map: backTex, transparent: true, side: THREE.FrontSide })
-      );
-      backMesh.rotation.x = -(rotX * Math.PI) / 180;
-      backMesh.rotation.y = (rotY * Math.PI) / 180 + Math.PI;
-      backMesh.scale.set(scale, scale, scale);
-      threeScene.add(backMesh);
+    // ============================================================
+    //  EDGE DEPTH BRANCH
+    //  If depth > 0, build ExtrudeGeometry with bevel + multi-material.
+    //  Otherwise fall back to flat PlaneGeometry (original behavior).
+    // ============================================================
+    if (depthPx > 0) {
+      // ExtrudeGeometry uses the shape's native units. Our shape is texW × texH,
+      // so depth is in the same units (pixel-space). Bevel is a small fraction.
+      const bevelPx = Math.min(depthPx * 0.5, 6 * exportScale);
+      const shape = buildRoundedRectShape(texW, texH, cornerRadius * exportScale);
+      const extrudeSettings = {
+        depth: depthPx,
+        bevelEnabled: true,
+        bevelThickness: bevelPx,
+        bevelSize: bevelPx,
+        bevelOffset: -bevelPx, // keeps overall footprint close to the flat plane
+        bevelSegments: 4,
+        curveSegments: 24,
+      };
+      const geo = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+      // Center Z so the mesh's origin is at the middle of its depth
+      geo.translate(0, 0, -depthPx / 2);
+      // Compute UVs per face group — ExtrudeGeometry gives group 0 = front+back caps, group 1 = sides.
+      // We override UVs on the front cap to map our texture correctly.
+      remapExtrudeUVs(geo, texW, texH);
+
+      const edgeColor = new THREE.Color(bezel > 0 ? bezelColor : '#2a2a2a');
+      const materials = [
+        // Group 0 = front + back caps (we override with custom materials via groups below)
+        new THREE.MeshPhongMaterial({
+          map: frontTex, transparent: true,
+          specular: 0x222222, shininess: 30, side: THREE.DoubleSide,
+        }),
+        // Group 1 = sides (bevel + extruded walls)
+        new THREE.MeshPhongMaterial({
+          color: edgeColor,
+          specular: 0x888888, shininess: 80, side: THREE.DoubleSide,
+        }),
+      ];
+
+      // Split group 0 into front/back so we can apply the back texture separately.
+      splitExtrudeFrontBack(geo, texW, texH, depthPx);
+      materials.splice(1, 0, new THREE.MeshPhongMaterial({
+        map: backTex, transparent: true,
+        specular: 0x111111, shininess: 20, side: THREE.DoubleSide,
+      }));
+      // Now: group 0 = front cap, group 1 = back cap, group 2 = sides
+
+      const mesh = new THREE.Mesh(geo, materials);
+      mesh.rotation.x = -(rotX * Math.PI) / 180;
+      mesh.rotation.y = (rotY * Math.PI) / 180;
+      mesh.scale.set(scale, scale, scale);
+      threeScene.add(mesh);
+    } else {
+      // Flat path — identical to original implementation
+      const geo = new THREE.PlaneGeometry(texW, texH);
+      const frontMesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map: frontTex, transparent: true, side: THREE.FrontSide }));
+      frontMesh.rotation.x = -(rotX * Math.PI) / 180;
+      frontMesh.rotation.y = (rotY * Math.PI) / 180;
+      frontMesh.scale.set(scale, scale, scale);
+      threeScene.add(frontMesh);
+
+      if (backCanvas) {
+        const backMesh = new THREE.Mesh(
+          new THREE.PlaneGeometry(texW, texH),
+          new THREE.MeshBasicMaterial({ map: backTex, transparent: true, side: THREE.FrontSide })
+        );
+        backMesh.rotation.x = -(rotX * Math.PI) / 180;
+        backMesh.rotation.y = (rotY * Math.PI) / 180 + Math.PI;
+        backMesh.scale.set(scale, scale, scale);
+        threeScene.add(backMesh);
+      }
     }
 
     renderer.render(threeScene, camera);
     const outCanvas = renderer.domElement;
     renderer.dispose();
     return outCanvas;
+  }
+
+  /**
+   * Remap UVs on the front cap of an ExtrudeGeometry so our texture maps 1:1.
+   * ExtrudeGeometry's default UVs for caps are based on geometry position and
+   * generally work, but we force a clean [0,1] mapping based on shape bounds.
+   */
+  function remapExtrudeUVs(geo, w, h) {
+    const pos = geo.attributes.position;
+    const uv = geo.attributes.uv;
+    const halfW = w / 2, halfH = h / 2;
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i);
+      const y = pos.getY(i);
+      // Only override UVs for front/back cap vertices (identified by being within the shape bounds).
+      // Side/bevel vertices get their native UVs, which are fine for a solid color material.
+      const u = (x + halfW) / w;
+      const v = (y + halfH) / h;
+      uv.setXY(i, u, v);
+    }
+    uv.needsUpdate = true;
+  }
+
+  /**
+   * ExtrudeGeometry produces two material groups: group 0 = front+back caps, group 1 = sides.
+   * We want three groups: front cap, back cap, sides — so front/back can use different textures.
+   * The caps share group 0; we split them by inspecting each face's normal Z-direction.
+   */
+  function splitExtrudeFrontBack(geo, w, h, depth) {
+    geo.computeVertexNormals();
+    const groups = geo.groups.slice();
+    const newGroups = [];
+    const pos = geo.attributes.position;
+    const normal = geo.attributes.normal;
+    const index = geo.index;
+
+    groups.forEach((g) => {
+      if (g.materialIndex !== 0) {
+        // Sides group — becomes materialIndex 2
+        newGroups.push({ start: g.start, count: g.count, materialIndex: 2 });
+        return;
+      }
+      // Cap group — split by face normal z
+      let frontStart = -1, frontCount = 0;
+      let backStart = -1, backCount = 0;
+      const end = g.start + g.count;
+      for (let i = g.start; i < end; i += 3) {
+        const a = index ? index.getX(i) : i;
+        const nz = normal.getZ(a);
+        if (nz >= 0) {
+          if (frontStart === -1) {
+            // Flush any pending back range before starting a new front range
+            if (backCount > 0) {
+              newGroups.push({ start: backStart, count: backCount, materialIndex: 1 });
+              backStart = -1; backCount = 0;
+            }
+            frontStart = i;
+          }
+          frontCount += 3;
+        } else {
+          if (backStart === -1) {
+            if (frontCount > 0) {
+              newGroups.push({ start: frontStart, count: frontCount, materialIndex: 0 });
+              frontStart = -1; frontCount = 0;
+            }
+            backStart = i;
+          }
+          backCount += 3;
+        }
+      }
+      if (frontCount > 0) newGroups.push({ start: frontStart, count: frontCount, materialIndex: 0 });
+      if (backCount > 0) newGroups.push({ start: backStart, count: backCount, materialIndex: 1 });
+    });
+
+    geo.clearGroups();
+    newGroups.forEach((g) => geo.addGroup(g.start, g.count, g.materialIndex));
   }
 
   function roundRect(ctx, x, y, w, h, r) {
@@ -761,6 +1033,7 @@
       cornerRadius: +cRadius.value,
       bezel: +cBezel.value,
       bezelColor: cBezelColor.value,
+      edgeDepth: +cEdgeDepth.value,
       glossEnabled: cGlossEnabled.checked,
       glossIntensity: +cGlossInt.value / 100,
       glossAngle: +cGlossAngle.value,
@@ -888,81 +1161,21 @@
 
   function wait(ms) { return new Promise((r) => setTimeout(r, ms)); }
 
-  // ======== Reset ========
+  // ======== Global reset (all sections) ========
   function resetAll() {
-    const D = DEFAULTS;
-    cRadius.value = D.cornerRadius;
-    cBezel.value = D.bezel;
-    cBezelColor.value = D.bezelColor; cBezelColorHex.value = D.bezelColor;
-    cRotX.value = D.rotateX; cRotY.value = D.rotateY;
-    cPerspective.value = D.perspective; cScale.value = D.scale;
-    cMouseCtrl.checked = D.mouseControl; cOrtho.checked = D.orthographic;
+    Object.keys(SECTION_DEFAULTS).forEach((key) => resetSection(key));
 
-    cGlossEnabled.checked = D.glossEnabled;
-    glossControls.classList.add('hidden');
-    cGlossInt.value = D.glossIntensity; cGlossAngle.value = D.glossAngle;
-    cGlossColor.value = D.glossColor; cGlossColorHex.value = D.glossColor;
-    cGlossBlend.value = D.glossBlend;
+    // Also reset export scale and back image state (not part of any section)
+    cExportScale.value = DEFAULTS.exportScale;
+    $('#exportScaleVal').textContent = DEFAULTS.exportScale + '×';
 
-    cInnerShadowEnabled.checked = D.innerShadowEnabled;
-    innerShadowControls.classList.add('hidden');
-    cInnerShadowInt.value = D.innerShadowIntensity;
-    cInnerShadowAngle.value = D.innerShadowAngle;
-    cInnerShadowColor.value = D.innerShadowColor; cInnerShadowColorHex.value = D.innerShadowColor;
-    cInnerShadowBlend.value = D.innerShadowBlend;
-
-    cDropShadowEnabled.checked = D.dropShadowEnabled;
-    dropShadowControls.classList.add('hidden');
-    cShadowInt.value = D.shadowIntensity;
-    cShadowBlur.value = D.shadowBlur;
-    cShadowOffsetX.value = D.shadowOffsetX;
-    cShadowOffsetY.value = D.shadowOffsetY;
-    cShadowSpread.value = D.shadowSpread;
-    cShadowColor.value = D.shadowColor; cShadowColorHex.value = D.shadowColor;
-
-    cAnimHover.checked = D.animateHover;
-    cAnimMode.value = D.animMode;
-    cAnimSpeed.value = D.animSpeed;
-    cAnimAmplitude.value = D.animAmplitude;
-    cExportScale.value = D.exportScale;
-    state.bgMode = D.bgMode; state.bgColor = D.bgColor;
-    state.backImage = null; state.backImageDataURL = null;
+    state.backImage = null;
+    state.backImageDataURL = null;
     backImageInput.value = '';
     backImageEl.src = '';
     backImageEl.classList.remove('loaded');
     screenBack.style.display = 'none';
     btnRemoveBack.classList.add('hidden');
-
-    $('#cornerRadiusVal').textContent = D.cornerRadius + 'px';
-    $('#bezelVal').textContent = D.bezel + 'px';
-    $('#rotateXVal').textContent = D.rotateX + '°';
-    $('#rotateYVal').textContent = D.rotateY + '°';
-    $('#perspectiveVal').textContent = D.perspective;
-    $('#scaleVal').textContent = D.scale + '%';
-    $('#glossIntensityVal').textContent = D.glossIntensity + '%';
-    $('#glossAngleVal').textContent = D.glossAngle + '°';
-    $('#innerShadowIntensityVal').textContent = D.innerShadowIntensity + '%';
-    $('#innerShadowAngleVal').textContent = D.innerShadowAngle + '°';
-    $('#shadowIntensityVal').textContent = D.shadowIntensity + '%';
-    $('#shadowBlurVal').textContent = D.shadowBlur + 'px';
-    $('#shadowOffsetXVal').textContent = D.shadowOffsetX + 'px';
-    $('#shadowOffsetYVal').textContent = D.shadowOffsetY + 'px';
-    $('#shadowSpreadVal').textContent = D.shadowSpread + 'px';
-    $('#animSpeedVal').textContent = D.animSpeed + 's';
-    $('#animAmplitudeVal').textContent = D.animAmplitude + '°';
-    $('#exportScaleVal').textContent = D.exportScale + '×';
-
-    bgButtons.forEach((b) => b.classList.remove('active'));
-    document.querySelector('[data-bg="transparent"]').classList.add('active');
-    bgColorPickerRow.classList.add('hidden');
-    bgColorPicker.value = '#000000'; bgColorHex.value = '#000000';
-    bgColorSwatch.style.background = '#000';
-
-    animModeRow.classList.add('hidden');
-    animSpeedRow.classList.add('hidden');
-    animAmplitudeRow.classList.add('hidden');
-    backImageRow.classList.add('hidden');
-    btnExportWebm.classList.add('hidden');
 
     applyAll();
   }

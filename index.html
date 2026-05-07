@@ -18,7 +18,7 @@
         <img src="assets/header-logo.svg" alt="Overwolf — 3D Screen Mockup Generator" class="header-logo" />
       </div>
       <div class="header-actions">
-        <button class="btn-m btn-ghost" id="btnReset">RESET</button>
+        <button class="btn-m btn-ghost" id="btnReset">RESET ALL</button>
       </div>
     </header>
 
@@ -46,6 +46,8 @@
                   <div class="screen-gloss" id="screenGloss"></div>
                   <!-- Inner shadow = shading (opposite of gloss) -->
                   <div class="screen-inner-shadow" id="screenInnerShadow"></div>
+                  <!-- Chamfer bevel preview (faux 3D edge) -->
+                  <div class="screen-chamfer" id="screenChamfer"></div>
                 </div>
                 <!-- Back face — mirrored behind the screen for turntable -->
                 <div class="screen-back" id="screenBack">
@@ -68,7 +70,9 @@
       <!-- Controls Panel -->
       <aside class="controls-panel" id="controlsPanel">
         <div class="panel-section">
-          <h2 class="panel-title">Image</h2>
+          <div class="panel-title-row">
+            <h2 class="panel-title">Image</h2>
+          </div>
           <label class="btn-m btn-primary upload-btn-wrap" for="fileInput">
             UPLOAD IMAGE
             <input type="file" id="fileInput" accept="image/*" hidden />
@@ -78,16 +82,27 @@
         <div class="panel-divider"></div>
 
         <div class="panel-section">
-          <h2 class="panel-title">Screen Shape</h2>
+          <div class="panel-title-row">
+            <h2 class="panel-title">Screen Shape</h2>
+            <button class="panel-reset" data-reset="shape" title="Reset Screen Shape">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7a5 5 0 1 0 1.5-3.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><path d="M1 1v3.5h3.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+          </div>
           <div class="control-row"><label class="control-label">Corner Radius</label><div class="slider-row"><input type="range" class="ow-slider" id="cornerRadius" min="0" max="80" value="12" /><span class="slider-value" id="cornerRadiusVal">12px</span></div></div>
           <div class="control-row"><label class="control-label">Bezel</label><div class="slider-row"><input type="range" class="ow-slider" id="bezel" min="0" max="32" value="0" /><span class="slider-value" id="bezelVal">0px</span></div></div>
           <div class="control-row"><label class="control-label">Bezel Color</label><div class="color-row"><input type="color" id="bezelColor" value="#1a1a1a" class="color-input" /><input type="text" id="bezelColorHex" value="#1a1a1a" class="hex-input" maxlength="7" /></div></div>
+          <div class="control-row"><label class="control-label">Edge Depth</label><div class="slider-row"><input type="range" class="ow-slider" id="edgeDepth" min="0" max="20" value="0" /><span class="slider-value" id="edgeDepthVal">0px</span></div></div>
         </div>
 
         <div class="panel-divider"></div>
 
         <div class="panel-section">
-          <h2 class="panel-title">3D Angle</h2>
+          <div class="panel-title-row">
+            <h2 class="panel-title">3D Angle</h2>
+            <button class="panel-reset" data-reset="angle" title="Reset 3D Angle">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7a5 5 0 1 0 1.5-3.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><path d="M1 1v3.5h3.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+          </div>
           <div class="control-row"><label class="control-label">Rotate X</label><div class="slider-row"><input type="range" class="ow-slider" id="rotateX" min="-45" max="45" value="0" /><span class="slider-value" id="rotateXVal">0°</span></div></div>
           <div class="control-row"><label class="control-label">Rotate Y</label><div class="slider-row"><input type="range" class="ow-slider" id="rotateY" min="-45" max="45" value="0" /><span class="slider-value" id="rotateYVal">0°</span></div></div>
           <div class="control-row"><label class="control-label">Perspective</label><div class="slider-row"><input type="range" class="ow-slider" id="perspective" min="400" max="2000" value="900" /><span class="slider-value" id="perspectiveVal">900</span></div></div>
@@ -99,7 +114,12 @@
         <div class="panel-divider"></div>
 
         <div class="panel-section">
-          <div class="control-row checkbox-row"><h2 class="panel-title" style="margin:0">Gloss</h2><label class="ow-switch"><input type="checkbox" id="glossEnabled" /><span class="switch-track"></span></label></div>
+          <div class="panel-title-row">
+            <div class="control-row checkbox-row" style="flex:1; gap: var(--space-200);"><h2 class="panel-title" style="margin:0">Gloss</h2><label class="ow-switch"><input type="checkbox" id="glossEnabled" /><span class="switch-track"></span></label></div>
+            <button class="panel-reset" data-reset="gloss" title="Reset Gloss">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7a5 5 0 1 0 1.5-3.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><path d="M1 1v3.5h3.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+          </div>
           <div id="glossControls" class="hidden">
             <div class="control-row"><label class="control-label">Intensity</label><div class="slider-row"><input type="range" class="ow-slider" id="glossIntensity" min="0" max="100" value="30" /><span class="slider-value" id="glossIntensityVal">30%</span></div></div>
             <div class="control-row"><label class="control-label">Angle</label><div class="slider-row"><input type="range" class="ow-slider" id="glossAngle" min="0" max="360" value="135" /><span class="slider-value" id="glossAngleVal">135°</span></div></div>
@@ -111,7 +131,12 @@
         <div class="panel-divider"></div>
 
         <div class="panel-section">
-          <div class="control-row checkbox-row"><h2 class="panel-title" style="margin:0">Inner Shadow</h2><label class="ow-switch"><input type="checkbox" id="innerShadowEnabled" /><span class="switch-track"></span></label></div>
+          <div class="panel-title-row">
+            <div class="control-row checkbox-row" style="flex:1; gap: var(--space-200);"><h2 class="panel-title" style="margin:0">Inner Shadow</h2><label class="ow-switch"><input type="checkbox" id="innerShadowEnabled" /><span class="switch-track"></span></label></div>
+            <button class="panel-reset" data-reset="innerShadow" title="Reset Inner Shadow">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7a5 5 0 1 0 1.5-3.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><path d="M1 1v3.5h3.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+          </div>
           <div id="innerShadowControls" class="hidden">
             <div class="control-row"><label class="control-label">Intensity</label><div class="slider-row"><input type="range" class="ow-slider" id="innerShadowIntensity" min="0" max="100" value="25" /><span class="slider-value" id="innerShadowIntensityVal">25%</span></div></div>
             <div class="control-row"><label class="control-label">Angle</label><div class="slider-row"><input type="range" class="ow-slider" id="innerShadowAngle" min="0" max="360" value="315" /><span class="slider-value" id="innerShadowAngleVal">315°</span></div></div>
@@ -123,7 +148,12 @@
         <div class="panel-divider"></div>
 
         <div class="panel-section">
-          <div class="control-row checkbox-row"><h2 class="panel-title" style="margin:0">Drop Shadow</h2><label class="ow-switch"><input type="checkbox" id="dropShadowEnabled" /><span class="switch-track"></span></label></div>
+          <div class="panel-title-row">
+            <div class="control-row checkbox-row" style="flex:1; gap: var(--space-200);"><h2 class="panel-title" style="margin:0">Drop Shadow</h2><label class="ow-switch"><input type="checkbox" id="dropShadowEnabled" /><span class="switch-track"></span></label></div>
+            <button class="panel-reset" data-reset="dropShadow" title="Reset Drop Shadow">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7a5 5 0 1 0 1.5-3.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><path d="M1 1v3.5h3.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+          </div>
           <div id="dropShadowControls" class="hidden">
             <div class="control-row"><label class="control-label">Strength</label><div class="slider-row"><input type="range" class="ow-slider" id="shadowIntensity" min="0" max="100" value="40" /><span class="slider-value" id="shadowIntensityVal">40%</span></div></div>
             <div class="control-row"><label class="control-label">Blur</label><div class="slider-row"><input type="range" class="ow-slider" id="shadowBlur" min="0" max="120" value="40" /><span class="slider-value" id="shadowBlurVal">40px</span></div></div>
@@ -137,7 +167,12 @@
         <div class="panel-divider"></div>
 
         <div class="panel-section">
-          <h2 class="panel-title">Background</h2>
+          <div class="panel-title-row">
+            <h2 class="panel-title">Background</h2>
+            <button class="panel-reset" data-reset="background" title="Reset Background">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7a5 5 0 1 0 1.5-3.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><path d="M1 1v3.5h3.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+          </div>
           <div class="bg-options">
             <button class="bg-option active" data-bg="transparent"><span class="bg-swatch bg-checker"></span><span>Transparent</span></button>
             <button class="bg-option" data-bg="color"><span class="bg-swatch" id="bgColorSwatch" style="background:#000"></span><span>Color</span></button>
@@ -152,7 +187,12 @@
         <div class="panel-divider"></div>
 
         <div class="panel-section">
-          <h2 class="panel-title">Animation</h2>
+          <div class="panel-title-row">
+            <h2 class="panel-title">Animation</h2>
+            <button class="panel-reset" data-reset="animation" title="Reset Animation">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7a5 5 0 1 0 1.5-3.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><path d="M1 1v3.5h3.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+          </div>
           <div class="control-row checkbox-row"><label class="control-label">Animate</label><label class="ow-switch"><input type="checkbox" id="animateHover" /><span class="switch-track"></span></label></div>
           <div class="control-row hidden" id="animModeRow">
             <label class="control-label">Mode</label>
@@ -180,7 +220,9 @@
         <div class="panel-divider"></div>
 
         <div class="panel-section">
-          <h2 class="panel-title">Export</h2>
+          <div class="panel-title-row">
+            <h2 class="panel-title">Export</h2>
+          </div>
           <div class="control-row"><label class="control-label">Resolution</label><div class="slider-row"><input type="range" class="ow-slider" id="exportScale" min="1" max="4" value="2" step="1"/><span class="slider-value" id="exportScaleVal">2×</span></div></div>
           <button class="btn-m btn-primary" id="btnExportPng">DOWNLOAD PNG</button>
           <button class="btn-m btn-secondary hidden" id="btnExportWebm">DOWNLOAD WEBM</button>
