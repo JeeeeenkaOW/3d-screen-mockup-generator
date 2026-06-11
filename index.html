@@ -46,6 +46,8 @@
                   <div class="screen-gloss" id="screenGloss"></div>
                   <!-- Inner shadow = shading (opposite of gloss) -->
                   <div class="screen-inner-shadow" id="screenInnerShadow"></div>
+                  <!-- Edge material (glass rim / worn edge) -->
+                  <div class="screen-edge" id="screenEdge"></div>
                 </div>
                 <!-- Back face — mirrored behind the screen for turntable -->
                 <div class="screen-back" id="screenBack">
@@ -82,14 +84,15 @@
           <div class="control-row"><label class="control-label">Corner Radius</label><div class="slider-row"><input type="range" class="ow-slider" id="cornerRadius" min="0" max="80" value="12" /><span class="slider-value" id="cornerRadiusVal">12px</span></div></div>
           <div class="control-row"><label class="control-label">Bezel</label><div class="slider-row"><input type="range" class="ow-slider" id="bezel" min="0" max="32" value="0" /><span class="slider-value" id="bezelVal">0px</span></div></div>
           <div class="control-row"><label class="control-label">Bezel Color</label><div class="color-row"><input type="color" id="bezelColor" value="#1a1a1a" class="color-input" /><input type="text" id="bezelColorHex" value="#1a1a1a" class="hex-input" maxlength="7" /></div></div>
+          <div class="control-row"><label class="control-label">Bezel Style</label><select class="ow-select" id="bezelStyle"><option value="solid" selected>Solid</option><option value="brushed">Brushed metal</option><option value="glass">Glass tint</option></select></div>
         </div>
 
         <div class="panel-divider"></div>
 
         <div class="panel-section">
           <h2 class="panel-title">3D Angle</h2>
-          <div class="control-row"><label class="control-label">Rotate X</label><div class="slider-row"><input type="range" class="ow-slider" id="rotateX" min="-45" max="45" value="0" /><span class="slider-value" id="rotateXVal">0°</span></div></div>
-          <div class="control-row"><label class="control-label">Rotate Y</label><div class="slider-row"><input type="range" class="ow-slider" id="rotateY" min="-45" max="45" value="0" /><span class="slider-value" id="rotateYVal">0°</span></div></div>
+          <div class="control-row"><label class="control-label">Rotate X</label><div class="slider-row"><input type="range" class="ow-slider" id="rotateX" min="-90" max="90" value="0" /><span class="slider-value" id="rotateXVal">0°</span></div></div>
+          <div class="control-row"><label class="control-label">Rotate Y</label><div class="slider-row"><input type="range" class="ow-slider" id="rotateY" min="-180" max="180" value="0" /><span class="slider-value" id="rotateYVal">0°</span></div></div>
           <div class="control-row"><label class="control-label">Perspective</label><div class="slider-row"><input type="range" class="ow-slider" id="perspective" min="400" max="2000" value="900" /><span class="slider-value" id="perspectiveVal">900</span></div></div>
           <div class="control-row"><label class="control-label">Scale</label><div class="slider-row"><input type="range" class="ow-slider" id="scale" min="30" max="150" value="80" /><span class="slider-value" id="scaleVal">80%</span></div></div>
           <div class="control-row checkbox-row"><label class="control-label">Mouse Control</label><label class="ow-switch"><input type="checkbox" id="mouseControl" checked /><span class="switch-track"></span></label></div>
@@ -123,7 +126,29 @@
         <div class="panel-divider"></div>
 
         <div class="panel-section">
-          <div class="control-row checkbox-row"><h2 class="panel-title" style="margin:0">Drop Shadow</h2><label class="ow-switch"><input type="checkbox" id="dropShadowEnabled" /><span class="switch-track"></span></label></div>
+          <div class="control-row checkbox-row"><h2 class="panel-title" style="margin:0">Glass Edge</h2><label class="ow-switch"><input type="checkbox" id="glassEnabled" /><span class="switch-track"></span></label></div>
+          <div id="glassControls" class="hidden">
+            <div class="control-row"><label class="control-label">Thickness</label><div class="slider-row"><input type="range" class="ow-slider" id="glassThickness" min="2" max="40" value="14" /><span class="slider-value" id="glassThicknessVal">14px</span></div></div>
+            <div class="control-row"><label class="control-label">Sheen</label><div class="slider-row"><input type="range" class="ow-slider" id="glassSheen" min="0" max="100" value="65" /><span class="slider-value" id="glassSheenVal">65%</span></div></div>
+            <div class="control-row"><label class="control-label">Refraction</label><div class="slider-row"><input type="range" class="ow-slider" id="glassRefraction" min="0" max="100" value="45" /><span class="slider-value" id="glassRefractionVal">45%</span></div></div>
+            <div class="control-row"><label class="control-label">Light Angle</label><div class="slider-row"><input type="range" class="ow-slider" id="glassAngle" min="0" max="360" value="135" /><span class="slider-value" id="glassAngleVal">135°</span></div></div>
+            <div class="control-row checkbox-row"><label class="control-label">Frost</label><label class="ow-switch"><input type="checkbox" id="glassFrost" /><span class="switch-track"></span></label></div>
+            <div class="control-row hidden" id="glassFrostRow"><label class="control-label">Frost Amount</label><div class="slider-row"><input type="range" class="ow-slider" id="glassFrostAmount" min="0" max="100" value="40" /><span class="slider-value" id="glassFrostAmountVal">40%</span></div></div>
+          </div>
+        </div>
+
+        <div class="panel-divider"></div>
+
+        <div class="panel-section">
+          <div class="control-row checkbox-row"><h2 class="panel-title" style="margin:0">Worn Edges</h2><label class="ow-switch"><input type="checkbox" id="wornEnabled" /><span class="switch-track"></span></label></div>
+          <div id="wornControls" class="hidden">
+            <div class="control-row"><label class="control-label">Amount</label><div class="slider-row"><input type="range" class="ow-slider" id="wornAmount" min="0" max="100" value="45" /><span class="slider-value" id="wornAmountVal">45%</span></div></div>
+            <div class="control-row"><label class="control-label">Roughness</label><div class="slider-row"><input type="range" class="ow-slider" id="wornScale" min="2" max="30" value="10" /><span class="slider-value" id="wornScaleVal">10px</span></div></div>
+            <div class="control-row"><label class="control-label">Depth</label><div class="slider-row"><input type="range" class="ow-slider" id="wornDepth" min="2" max="30" value="9" /><span class="slider-value" id="wornDepthVal">9px</span></div></div>
+          </div>
+        </div>
+
+        <div class="panel-divider"></div>
           <div id="dropShadowControls" class="hidden">
             <div class="control-row"><label class="control-label">Strength</label><div class="slider-row"><input type="range" class="ow-slider" id="shadowIntensity" min="0" max="100" value="40" /><span class="slider-value" id="shadowIntensityVal">40%</span></div></div>
             <div class="control-row"><label class="control-label">Blur</label><div class="slider-row"><input type="range" class="ow-slider" id="shadowBlur" min="0" max="120" value="40" /><span class="slider-value" id="shadowBlurVal">40px</span></div></div>

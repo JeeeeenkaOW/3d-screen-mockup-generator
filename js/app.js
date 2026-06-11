@@ -29,6 +29,26 @@
   const cBezel = $('#bezel');
   const cBezelColor = $('#bezelColor');
   const cBezelColorHex = $('#bezelColorHex');
+  const cBezelStyle = $('#bezelStyle');
+  const screenEdge = $('#screenEdge');
+
+  // Glass edge
+  const cGlassEnabled = $('#glassEnabled');
+  const glassControls = $('#glassControls');
+  const cGlassThickness = $('#glassThickness');
+  const cGlassSheen = $('#glassSheen');
+  const cGlassRefraction = $('#glassRefraction');
+  const cGlassAngle = $('#glassAngle');
+  const cGlassFrost = $('#glassFrost');
+  const glassFrostRow = $('#glassFrostRow');
+  const cGlassFrostAmount = $('#glassFrostAmount');
+
+  // Worn edges
+  const cWornEnabled = $('#wornEnabled');
+  const wornControls = $('#wornControls');
+  const cWornAmount = $('#wornAmount');
+  const cWornScale = $('#wornScale');
+  const cWornDepth = $('#wornDepth');
   const cRotX = $('#rotateX');
   const cRotY = $('#rotateY');
   const cPerspective = $('#perspective');
@@ -105,11 +125,13 @@
   };
 
   const DEFAULTS = {
-    cornerRadius: 12, bezel: 0, bezelColor: '#1a1a1a',
+    cornerRadius: 12, bezel: 0, bezelColor: '#1a1a1a', bezelStyle: 'solid',
     rotateX: 0, rotateY: 0, perspective: 900, scale: 80,
     mouseControl: true, orthographic: false,
     glossEnabled: false, glossIntensity: 30, glossAngle: 135, glossColor: '#ffffff', glossBlend: 'normal',
     innerShadowEnabled: false, innerShadowIntensity: 25, innerShadowAngle: 315, innerShadowColor: '#000000', innerShadowBlend: 'normal',
+    glassEnabled: false, glassThickness: 14, glassSheen: 65, glassRefraction: 45, glassAngle: 135, glassFrost: false, glassFrostAmount: 40,
+    wornEnabled: false, wornAmount: 45, wornScale: 10, wornDepth: 9,
     dropShadowEnabled: false, shadowIntensity: 40, shadowBlur: 40, shadowOffsetX: 0, shadowOffsetY: 20,
     shadowSpread: 0, shadowColor: '#000000',
     animateHover: false, animMode: 'tilt', animSpeed: 4, animAmplitude: 12,
@@ -176,6 +198,14 @@
       [cGlossAngle, 'glossAngleVal', '°'],
       [cInnerShadowInt, 'innerShadowIntensityVal', '%'],
       [cInnerShadowAngle, 'innerShadowAngleVal', '°'],
+      [cGlassThickness, 'glassThicknessVal', 'px'],
+      [cGlassSheen, 'glassSheenVal', '%'],
+      [cGlassRefraction, 'glassRefractionVal', '%'],
+      [cGlassAngle, 'glassAngleVal', '°'],
+      [cGlassFrostAmount, 'glassFrostAmountVal', '%'],
+      [cWornAmount, 'wornAmountVal', '%'],
+      [cWornScale, 'wornScaleVal', 'px'],
+      [cWornDepth, 'wornDepthVal', 'px'],
       [cShadowInt, 'shadowIntensityVal', '%'],
       [cShadowBlur, 'shadowBlurVal', 'px'],
       [cShadowOffsetX, 'shadowOffsetXVal', 'px'],
@@ -221,7 +251,21 @@
 
     cMouseCtrl.addEventListener('change', applyAll);
     cOrtho.addEventListener('change', applyAll);
+    cBezelStyle.addEventListener('change', applyAll);
     cAnimMode.addEventListener('change', () => { updateAnimUI(); applyAll(); });
+
+    cGlassEnabled.addEventListener('change', () => {
+      glassControls.classList.toggle('hidden', !cGlassEnabled.checked);
+      applyAll();
+    });
+    cGlassFrost.addEventListener('change', () => {
+      glassFrostRow.classList.toggle('hidden', !cGlassFrost.checked);
+      applyAll();
+    });
+    cWornEnabled.addEventListener('change', () => {
+      wornControls.classList.toggle('hidden', !cWornEnabled.checked);
+      applyAll();
+    });
 
     cAnimHover.addEventListener('change', () => {
       const on = cAnimHover.checked;
@@ -293,6 +337,7 @@
     const radius = +cRadius.value, bezel = +cBezel.value;
     const ortho = cOrtho.checked;
     const bezelC = cBezelColor.value;
+    const bezelStyle = cBezelStyle.value;
     const animOn = cAnimHover.checked;
     const animMode = cAnimMode.value;
     const animDur = +cAnimSpeed.value;
@@ -311,7 +356,7 @@
 
     if (bezel > 0) {
       screen_.style.padding = bezel + 'px';
-      screen_.style.background = bezelC;
+      screen_.style.background = bezelPaintCSS(bezelStyle, bezelC);
       screenContent.style.borderRadius = Math.max(0, radius - bezel) + 'px';
       screenContent.style.overflow = 'hidden';
     } else {
@@ -320,9 +365,11 @@
       screenContent.style.borderRadius = '0';
     }
 
-    // --- Back face (turntable preview) ---
+    // --- Back face ---
+    // Visible whenever an image is loaded so static Y/X flips past 90° reveal it
+    // (CSS backface-visibility hides whichever face points away). Turntable too.
     const isTurntable = animOn && animMode === 'turntable';
-    if (isTurntable) {
+    if (state.imageLoaded || isTurntable) {
       screenBack.style.display = 'block';
     } else {
       screenBack.style.display = 'none';
@@ -381,6 +428,31 @@
       screenInnerShadow.style.display = 'none';
     }
 
+    // --- Edge material (glass rim + worn edge) — shared canvases with export ---
+    const { edgeUrl, maskUrl } = previewEdgeURLs();
+    if (edgeUrl) {
+      screenEdge.style.backgroundImage = `url(${edgeUrl})`;
+      screenEdge.classList.add('active');
+    } else {
+      screenEdge.style.backgroundImage = '';
+      screenEdge.classList.remove('active');
+    }
+    if (maskUrl) {
+      screen_.style.webkitMaskImage = `url(${maskUrl})`;
+      screen_.style.maskImage = `url(${maskUrl})`;
+      screen_.style.webkitMaskSize = '100% 100%';
+      screen_.style.maskSize = '100% 100%';
+      screenBack.style.webkitMaskImage = `url(${maskUrl})`;
+      screenBack.style.maskImage = `url(${maskUrl})`;
+      screenBack.style.webkitMaskSize = '100% 100%';
+      screenBack.style.maskSize = '100% 100%';
+    } else {
+      screen_.style.webkitMaskImage = '';
+      screen_.style.maskImage = '';
+      screenBack.style.webkitMaskImage = '';
+      screenBack.style.maskImage = '';
+    }
+
     // --- Drop shadow ---
     if (cDropShadowEnabled.checked) {
       const shadowI = +cShadowInt.value / 100;
@@ -419,6 +491,233 @@
     return `${parseInt(hex.slice(1,3),16)},${parseInt(hex.slice(3,5),16)},${parseInt(hex.slice(5,7),16)}`;
   }
 
+  // ======== Shared edge-material canvas builders ========
+  // These produce the SAME pixels for the live CSS preview (res = 1) and the
+  // Three.js export texture (res = exportScale), so preview always matches export.
+
+  function mulberry32(seed) {
+    let a = seed >>> 0;
+    return function () {
+      a |= 0; a = (a + 0x6D2B79F5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  // Point on the rounded-rect border at perimeter fraction f (0..1).
+  function pointOnRect(w, h, inset, f) {
+    const x0 = inset, y0 = inset, ww = w - inset * 2, hh = h - inset * 2;
+    const per = 2 * (ww + hh);
+    let d = f * per;
+    if (d < ww) return { x: x0 + d, y: y0, nx: 0, ny: -1 };
+    d -= ww;
+    if (d < hh) return { x: x0 + ww, y: y0 + d, nx: 1, ny: 0 };
+    d -= hh;
+    if (d < ww) return { x: x0 + ww - d, y: y0 + hh, nx: 0, ny: 1 };
+    d -= ww;
+    return { x: x0, y: y0 + hh - d, nx: -1, ny: 0 };
+  }
+
+  // White rounded-rect mask, optionally eroded along the edge for a worn look.
+  function buildWornMask(w, h, radius, res, opts) {
+    const c = document.createElement('canvas');
+    c.width = Math.max(1, Math.round(w)); c.height = Math.max(1, Math.round(h));
+    const ctx = c.getContext('2d');
+    roundRect(ctx, 0, 0, c.width, c.height, radius);
+    ctx.fillStyle = '#fff';
+    ctx.fill();
+
+    if (opts.wornEnabled && opts.wornAmount > 0) {
+      const amount = opts.wornAmount / 100;
+      const scaleR = Math.max(1, opts.wornScale * res);
+      const depth = Math.max(1, opts.wornDepth * res);
+      const per = 2 * (c.width + c.height);
+      const count = Math.round((per / (scaleR * 1.4)) * (0.35 + amount));
+      const rng = mulberry32(98765);
+      ctx.globalCompositeOperation = 'destination-out';
+      for (let i = 0; i < count; i++) {
+        const f = rng();
+        const p = pointOnRect(c.width, c.height, 0, f);
+        // nudge inward by a random fraction of depth so notches bite the edge
+        const inward = rng() * depth * (0.4 + amount);
+        const cx = p.x - p.nx * inward;
+        const cy = p.y - p.ny * inward;
+        const r = scaleR * (0.35 + rng() * 0.9);
+        const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+        const a = 0.55 + rng() * 0.45 * amount;
+        g.addColorStop(0, `rgba(0,0,0,${a})`);
+        g.addColorStop(0.7, `rgba(0,0,0,${a * 0.5})`);
+        g.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.globalCompositeOperation = 'source-over';
+    }
+    return c;
+  }
+
+  // Transparent-centre overlay: a glass rim (sheen + faux refraction + frost) on the edge band.
+  function buildEdgeOverlay(w, h, radius, res, opts) {
+    const c = document.createElement('canvas');
+    c.width = Math.max(1, Math.round(w)); c.height = Math.max(1, Math.round(h));
+    const ctx = c.getContext('2d');
+    if (!opts.glassEnabled) return c;
+
+    const thick = Math.max(1, opts.glassThickness * res);
+    const sheen = opts.glassSheen / 100;
+    const refr = opts.glassRefraction / 100;
+    const innerRad = Math.max(0, radius - thick);
+    const cx = c.width / 2, cy = c.height / 2;
+    const halfDiag = Math.hypot(c.width, c.height) / 2;
+
+    // Clip to the outer rounded rect for everything that follows.
+    ctx.save();
+    roundRect(ctx, 0, 0, c.width, c.height, radius);
+    ctx.clip();
+
+    // Base glass body tint across the band region.
+    ctx.fillStyle = `rgba(255,255,255,${0.06 + sheen * 0.06})`;
+    ctx.fillRect(0, 0, c.width, c.height);
+
+    // Frost: translucent fill + speckle texture.
+    if (opts.glassFrost) {
+      const fa = (opts.glassFrostAmount / 100);
+      ctx.fillStyle = `rgba(255,255,255,${0.10 + fa * 0.45})`;
+      ctx.fillRect(0, 0, c.width, c.height);
+      const rng = mulberry32(24680);
+      const dots = Math.round((c.width * c.height) / (900 / res));
+      for (let i = 0; i < dots; i++) {
+        const x = rng() * c.width, y = rng() * c.height;
+        const r = (0.5 + rng() * 1.4) * res;
+        ctx.fillStyle = `rgba(255,255,255,${0.04 + rng() * 0.10 * fa})`;
+        ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+      }
+    }
+
+    // Directional sheen sweep.
+    const g = cssAngleToCanvasGradient(opts.glassAngle, cx, cy, halfDiag);
+    const sweep = ctx.createLinearGradient(g.x1, g.y1, g.x2, g.y2);
+    sweep.addColorStop(0, `rgba(255,255,255,${0.55 * sheen})`);
+    sweep.addColorStop(0.35, `rgba(255,255,255,${0.12 * sheen})`);
+    sweep.addColorStop(0.55, 'rgba(255,255,255,0)');
+    sweep.addColorStop(0.85, `rgba(255,255,255,${0.18 * sheen})`);
+    sweep.addColorStop(1, `rgba(255,255,255,${0.45 * sheen})`);
+    ctx.fillStyle = sweep;
+    ctx.fillRect(0, 0, c.width, c.height);
+
+    // Bright inner bevel highlight (top-left light wrap).
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = thick * 0.55;
+    ctx.strokeStyle = `rgba(255,255,255,${0.5 * (0.4 + sheen)})`;
+    ctx.shadowColor = `rgba(255,255,255,${0.6 * sheen})`;
+    ctx.shadowBlur = thick * 0.8;
+    roundRect(ctx, thick * 0.5, thick * 0.5, c.width - thick, c.height - thick, Math.max(0, innerRad));
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    // Faux refraction / chromatic dispersion on the inner edge.
+    if (refr > 0) {
+      const off = Math.max(0.6, thick * 0.10) + refr * thick * 0.18;
+      ctx.lineWidth = Math.max(1, thick * 0.18);
+      ctx.strokeStyle = `rgba(255,80,80,${0.5 * refr})`;
+      roundRect(ctx, thick - off, thick - off, c.width - (thick - off) * 2, c.height - (thick - off) * 2, Math.max(0, innerRad + off));
+      ctx.stroke();
+      ctx.strokeStyle = `rgba(80,180,255,${0.5 * refr})`;
+      roundRect(ctx, thick + off, thick + off, c.width - (thick + off) * 2, c.height - (thick + off) * 2, Math.max(0, innerRad - off));
+      ctx.stroke();
+    }
+
+    // Subtle dark outer edge for thickness read.
+    ctx.lineWidth = Math.max(1, thick * 0.16);
+    ctx.strokeStyle = 'rgba(0,0,0,0.28)';
+    roundRect(ctx, ctx.lineWidth / 2, ctx.lineWidth / 2, c.width - ctx.lineWidth, c.height - ctx.lineWidth, radius);
+    ctx.stroke();
+
+    // Punch out the centre so only the rim band remains.
+    ctx.globalCompositeOperation = 'destination-out';
+    roundRect(ctx, thick, thick, c.width - thick * 2, c.height - thick * 2, Math.max(0, innerRad));
+    ctx.fillStyle = '#000';
+    ctx.fill();
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.restore();
+    return c;
+  }
+
+  // Bezel paint as a CSS background string (preview).
+  function bezelPaintCSS(style, color) {
+    if (style === 'brushed') {
+      return `repeating-linear-gradient(90deg, ${shade(color, -18)} 0px, ${shade(color, 14)} 2px, ${shade(color, -8)} 4px), linear-gradient(180deg, ${shade(color, 20)}, ${shade(color, -22)})`;
+    }
+    if (style === 'glass') {
+      return `linear-gradient(135deg, ${shade(color, 30)} 0%, ${color} 45%, ${shade(color, -24)} 100%)`;
+    }
+    return color;
+  }
+
+  // Bezel paint as a canvas fillStyle (export). ctx + rect needed for gradients.
+  function bezelPaintCanvas(ctx, style, color, x, y, w, h) {
+    if (style === 'brushed') {
+      const grad = ctx.createLinearGradient(x, y, x, y + h);
+      grad.addColorStop(0, shade(color, 20));
+      grad.addColorStop(0.5, shade(color, -6));
+      grad.addColorStop(1, shade(color, -22));
+      return grad;
+    }
+    if (style === 'glass') {
+      const grad = ctx.createLinearGradient(x, y, x + w, y + h);
+      grad.addColorStop(0, shade(color, 30));
+      grad.addColorStop(0.45, color);
+      grad.addColorStop(1, shade(color, -24));
+      return grad;
+    }
+    return color;
+  }
+
+  function shade(hex, amt) {
+    const n = parseInt(hex.slice(1), 16);
+    let r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+    r = Math.max(0, Math.min(255, r + amt));
+    g = Math.max(0, Math.min(255, g + amt));
+    b = Math.max(0, Math.min(255, b + amt));
+    return `rgb(${r},${g},${b})`;
+  }
+
+  // Read all edge/worn params once.
+  function edgeOpts() {
+    return {
+      glassEnabled: cGlassEnabled.checked,
+      glassThickness: +cGlassThickness.value,
+      glassSheen: +cGlassSheen.value,
+      glassRefraction: +cGlassRefraction.value,
+      glassAngle: +cGlassAngle.value,
+      glassFrost: cGlassFrost.checked,
+      glassFrostAmount: +cGlassFrostAmount.value,
+      wornEnabled: cWornEnabled.checked,
+      wornAmount: +cWornAmount.value,
+      wornScale: +cWornScale.value,
+      wornDepth: +cWornDepth.value,
+    };
+  }
+
+  // Memoised preview data-URLs (rotation drag calls applyAll often; these don't depend on angle).
+  let _previewMemo = { key: '', edgeUrl: '', maskUrl: '' };
+  function previewEdgeURLs() {
+    const eo = edgeOpts();
+    const w = state.naturalWidth, h = state.naturalHeight;
+    const radius = +cRadius.value;
+    const key = JSON.stringify([eo, w, h, radius]);
+    if (key === _previewMemo.key) return _previewMemo;
+    let edgeUrl = '', maskUrl = '';
+    if (eo.glassEnabled) edgeUrl = buildEdgeOverlay(w, h, radius, 1, eo).toDataURL('image/png');
+    if (eo.wornEnabled && eo.wornAmount > 0) maskUrl = buildWornMask(w, h, radius, 1, eo).toDataURL('image/png');
+    _previewMemo = { key, edgeUrl, maskUrl };
+    return _previewMemo;
+  }
+
+
   // ======== Drag rotate ========
   function bindDragRotate() {
     viewport.addEventListener('mousedown', onDragStart);
@@ -453,8 +752,8 @@
     if (!state.isDragging) return;
     const pt = e.touches ? e.touches[0] : e;
     const dx = pt.clientX - state.mouseStartX, dy = pt.clientY - state.mouseStartY;
-    cRotX.value = Math.round(Math.max(-45, Math.min(45, state.dragStartRx - dy * 0.3)));
-    cRotY.value = Math.round(Math.max(-45, Math.min(45, state.dragStartRy + dx * 0.3)));
+    cRotX.value = Math.round(Math.max(-90, Math.min(90, state.dragStartRx - dy * 0.4)));
+    cRotY.value = Math.round(Math.max(-180, Math.min(180, state.dragStartRy + dx * 0.4)));
     $('#rotateXVal').textContent = cRotX.value + '°';
     $('#rotateYVal').textContent = cRotY.value + '°';
     applyAll();
@@ -528,7 +827,7 @@
    */
   function buildFaceTexture(opts, sourceImg) {
     const {
-      cornerRadius, bezel, bezelColor,
+      cornerRadius, bezel, bezelColor, bezelStyle,
       glossEnabled, glossIntensity, glossAngle, glossColor, glossBlend,
       innerShadowEnabled, innerShadowIntensity, innerShadowAngle, innerShadowColor, innerShadowBlend,
       exportScale, screenW, screenH,
@@ -546,7 +845,7 @@
     // Bezel
     if (bezel > 0) {
       roundRect(tctx, 0, 0, texW, texH, cornerRadius * exportScale);
-      tctx.fillStyle = bezelColor;
+      tctx.fillStyle = bezelPaintCanvas(tctx, bezelStyle, bezelColor, 0, 0, texW, texH);
       tctx.fill();
     }
 
@@ -605,14 +904,15 @@
       tctx.restore();
     }
 
-    // Alpha mask
+    // Glass edge overlay — identical builder to the live preview
+    if (opts.glassEnabled) {
+      const edge = buildEdgeOverlay(texW, texH, cornerRadius * exportScale, exportScale, opts);
+      tctx.drawImage(edge, 0, 0);
+    }
+
+    // Alpha mask (worn-eroded if enabled, otherwise a clean rounded rect)
     tctx.globalCompositeOperation = 'destination-in';
-    const maskCanvas = document.createElement('canvas');
-    maskCanvas.width = texW; maskCanvas.height = texH;
-    const mctx = maskCanvas.getContext('2d');
-    roundRect(mctx, 0, 0, texW, texH, cornerRadius * exportScale);
-    mctx.fillStyle = '#fff';
-    mctx.fill();
+    const maskCanvas = buildWornMask(texW, texH, cornerRadius * exportScale, exportScale, opts);
     tctx.drawImage(maskCanvas, 0, 0);
     tctx.globalCompositeOperation = 'source-over';
 
@@ -636,18 +936,13 @@
     // Build front texture
     const frontCanvas = buildFaceTexture(opts, state.sourceImage);
 
-    // Build back texture: use back image if provided, otherwise dark solid
+    // Build back texture: use back image if provided, otherwise a blank panel
+    // (still gets the same bezel / glass rim / worn edge as the front).
     let backCanvas = null;
     if (hasBackImage && state.backImage) {
       backCanvas = buildFaceTexture(opts, state.backImage);
     } else {
-      // Solid dark back
-      backCanvas = document.createElement('canvas');
-      backCanvas.width = texW; backCanvas.height = texH;
-      const bctx = backCanvas.getContext('2d');
-      roundRect(bctx, 0, 0, texW, texH, cornerRadius * exportScale);
-      bctx.fillStyle = '#1a1a1a';
-      bctx.fill();
+      backCanvas = buildFaceTexture(opts, null);
     }
 
     // Scene sizing
@@ -761,6 +1056,7 @@
       cornerRadius: +cRadius.value,
       bezel: +cBezel.value,
       bezelColor: cBezelColor.value,
+      bezelStyle: cBezelStyle.value,
       glossEnabled: cGlossEnabled.checked,
       glossIntensity: +cGlossInt.value / 100,
       glossAngle: +cGlossAngle.value,
@@ -783,7 +1079,18 @@
       exportScale: +cExportScale.value,
       screenW: state.naturalWidth,
       screenH: state.naturalHeight,
-      hasBackImage: isTurntable && !!state.backImage,
+      hasBackImage: !!state.backImage,
+      glassEnabled: cGlassEnabled.checked,
+      glassThickness: +cGlassThickness.value,
+      glassSheen: +cGlassSheen.value,
+      glassRefraction: +cGlassRefraction.value,
+      glassAngle: +cGlassAngle.value,
+      glassFrost: cGlassFrost.checked,
+      glassFrostAmount: +cGlassFrostAmount.value,
+      wornEnabled: cWornEnabled.checked,
+      wornAmount: +cWornAmount.value,
+      wornScale: +cWornScale.value,
+      wornDepth: +cWornDepth.value,
     };
   }
 
@@ -894,6 +1201,7 @@
     cRadius.value = D.cornerRadius;
     cBezel.value = D.bezel;
     cBezelColor.value = D.bezelColor; cBezelColorHex.value = D.bezelColor;
+    cBezelStyle.value = D.bezelStyle;
     cRotX.value = D.rotateX; cRotY.value = D.rotateY;
     cPerspective.value = D.perspective; cScale.value = D.scale;
     cMouseCtrl.checked = D.mouseControl; cOrtho.checked = D.orthographic;
@@ -910,6 +1218,28 @@
     cInnerShadowAngle.value = D.innerShadowAngle;
     cInnerShadowColor.value = D.innerShadowColor; cInnerShadowColorHex.value = D.innerShadowColor;
     cInnerShadowBlend.value = D.innerShadowBlend;
+
+    cGlassEnabled.checked = D.glassEnabled;
+    glassControls.classList.add('hidden');
+    cGlassThickness.value = D.glassThickness;
+    cGlassSheen.value = D.glassSheen;
+    cGlassRefraction.value = D.glassRefraction;
+    cGlassAngle.value = D.glassAngle;
+    cGlassFrost.checked = D.glassFrost;
+    glassFrostRow.classList.add('hidden');
+    cGlassFrostAmount.value = D.glassFrostAmount;
+
+    cWornEnabled.checked = D.wornEnabled;
+    wornControls.classList.add('hidden');
+    cWornAmount.value = D.wornAmount;
+    cWornScale.value = D.wornScale;
+    cWornDepth.value = D.wornDepth;
+
+    screenEdge.style.backgroundImage = '';
+    screenEdge.classList.remove('active');
+    screen_.style.webkitMaskImage = ''; screen_.style.maskImage = '';
+    screenBack.style.webkitMaskImage = ''; screenBack.style.maskImage = '';
+    _previewMemo = { key: '', edgeUrl: '', maskUrl: '' };
 
     cDropShadowEnabled.checked = D.dropShadowEnabled;
     dropShadowControls.classList.add('hidden');
@@ -943,6 +1273,14 @@
     $('#glossAngleVal').textContent = D.glossAngle + '°';
     $('#innerShadowIntensityVal').textContent = D.innerShadowIntensity + '%';
     $('#innerShadowAngleVal').textContent = D.innerShadowAngle + '°';
+    $('#glassThicknessVal').textContent = D.glassThickness + 'px';
+    $('#glassSheenVal').textContent = D.glassSheen + '%';
+    $('#glassRefractionVal').textContent = D.glassRefraction + '%';
+    $('#glassAngleVal').textContent = D.glassAngle + '°';
+    $('#glassFrostAmountVal').textContent = D.glassFrostAmount + '%';
+    $('#wornAmountVal').textContent = D.wornAmount + '%';
+    $('#wornScaleVal').textContent = D.wornScale + 'px';
+    $('#wornDepthVal').textContent = D.wornDepth + 'px';
     $('#shadowIntensityVal').textContent = D.shadowIntensity + '%';
     $('#shadowBlurVal').textContent = D.shadowBlur + 'px';
     $('#shadowOffsetXVal').textContent = D.shadowOffsetX + 'px';

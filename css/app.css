@@ -258,6 +258,20 @@ body {
   z-index: 3;
 }
 
+/* Edge material overlay (glass rim / worn edge, baked canvas shared with export) */
+.screen-edge {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  z-index: 4;
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  background-position: center;
+  display: none;
+}
+.screen-edge.active { display: block; }
+
 /* Drop shadow behind screen (full 3D shadow, not just bottom) */
 .screen-shadow {
   position: absolute;
