@@ -131,7 +131,7 @@
     glossEnabled: false, glossIntensity: 30, glossAngle: 135, glossColor: '#ffffff', glossBlend: 'normal',
     innerShadowEnabled: false, innerShadowIntensity: 25, innerShadowAngle: 315, innerShadowColor: '#000000', innerShadowBlend: 'normal',
     glassEnabled: false, glassThickness: 14, glassSheen: 65, glassRefraction: 45, glassAngle: 135, glassFrost: false, glassFrostAmount: 40,
-    wornEnabled: false, wornAmount: 45, wornScale: 10, wornDepth: 9,
+    wornEnabled: false, wornAmount: 40, wornScale: 7, wornDepth: 6,
     dropShadowEnabled: false, shadowIntensity: 40, shadowBlur: 40, shadowOffsetX: 0, shadowOffsetY: 20,
     shadowSpread: 0, shadowColor: '#000000',
     animateHover: false, animMode: 'tilt', animSpeed: 4, animAmplitude: 12,
@@ -366,13 +366,22 @@
     }
 
     // --- Back face ---
-    // Visible whenever an image is loaded so static Y/X flips past 90° reveal it
-    // (CSS backface-visibility hides whichever face points away). Turntable too.
+    // Decide which face the viewer sees from the rotation, toggling display in JS
+    // rather than relying on CSS backface-visibility: applying a worn mask disables
+    // backface culling, so the mirrored back face would otherwise ghost through.
     const isTurntable = animOn && animMode === 'turntable';
-    if (state.imageLoaded || isTurntable) {
+    let nry = ((ry % 360) + 360) % 360; if (nry > 180) nry -= 360;
+    let nrx = ((rx % 360) + 360) % 360; if (nrx > 180) nrx -= 360;
+    const backFacing = (Math.abs(nry) > 90) !== (Math.abs(nrx) > 90); // XOR: either axis flips it
+    if (isTurntable) {
       screenBack.style.display = 'block';
+      screen_.style.visibility = 'visible';
+    } else if (state.imageLoaded && backFacing) {
+      screenBack.style.display = 'block';
+      screen_.style.visibility = 'hidden';
     } else {
       screenBack.style.display = 'none';
+      screen_.style.visibility = 'visible';
     }
 
     // --- Animation ---
@@ -530,24 +539,23 @@
 
     if (opts.wornEnabled && opts.wornAmount > 0) {
       const amount = opts.wornAmount / 100;
-      const scaleR = Math.max(1, opts.wornScale * res);
-      const depth = Math.max(1, opts.wornDepth * res);
+      const rough = Math.max(1, opts.wornScale * res);  // nibble size
+      const depth = Math.max(1, opts.wornDepth * res);   // inward reach
       const per = 2 * (c.width + c.height);
-      const count = Math.round((per / (scaleR * 1.4)) * (0.35 + amount));
+      const count = Math.round((per / (rough * 1.1)) * (0.4 + amount * 1.1));
       const rng = mulberry32(98765);
       ctx.globalCompositeOperation = 'destination-out';
       for (let i = 0; i < count; i++) {
-        const f = rng();
-        const p = pointOnRect(c.width, c.height, 0, f);
-        // nudge inward by a random fraction of depth so notches bite the edge
-        const inward = rng() * depth * (0.4 + amount);
-        const cx = p.x - p.nx * inward;
-        const cy = p.y - p.ny * inward;
-        const r = scaleR * (0.35 + rng() * 0.9);
+        const p = pointOnRect(c.width, c.height, 0, rng());
+        // hug the edge: most nibbles bite from the rim inward by a small amount
+        const inward = (rng() * rng()) * depth;            // biased toward the edge
+        const cx = p.x - p.nx * inward + (rng() - 0.5) * rough * 0.4;
+        const cy = p.y - p.ny * inward + (rng() - 0.5) * rough * 0.4;
+        const r = rough * (0.25 + rng() * 0.55);
+        // crisp cut with only a 1–2px anti-aliased rim (no wide translucent halo)
         const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
-        const a = 0.55 + rng() * 0.45 * amount;
-        g.addColorStop(0, `rgba(0,0,0,${a})`);
-        g.addColorStop(0.7, `rgba(0,0,0,${a * 0.5})`);
+        g.addColorStop(0, 'rgba(0,0,0,1)');
+        g.addColorStop(0.82, 'rgba(0,0,0,1)');
         g.addColorStop(1, 'rgba(0,0,0,0)');
         ctx.fillStyle = g;
         ctx.beginPath();
@@ -559,7 +567,9 @@
     return c;
   }
 
-  // Transparent-centre overlay: a glass rim (sheen + faux refraction + frost) on the edge band.
+  // Glass material overlay: treats the WHOLE card face (body sheen + glare + optional
+  // frost) with an emphasized bevelled rim. Centre is kept (not punched) so the body
+  // reads as glass over the image.
   function buildEdgeOverlay(w, h, radius, res, opts) {
     const c = document.createElement('canvas');
     c.width = Math.max(1, Math.round(w)); c.height = Math.max(1, Math.round(h));
@@ -573,42 +583,46 @@
     const cx = c.width / 2, cy = c.height / 2;
     const halfDiag = Math.hypot(c.width, c.height) / 2;
 
-    // Clip to the outer rounded rect for everything that follows.
     ctx.save();
     roundRect(ctx, 0, 0, c.width, c.height, radius);
     ctx.clip();
 
-    // Base glass body tint across the band region.
-    ctx.fillStyle = `rgba(255,255,255,${0.06 + sheen * 0.06})`;
+    // ---- BODY (whole face) ----
+    // Faint overall tint so the surface reads as a pane of glass.
+    ctx.fillStyle = `rgba(255,255,255,${0.03 + sheen * 0.05})`;
     ctx.fillRect(0, 0, c.width, c.height);
 
-    // Frost: translucent fill + speckle texture.
+    // Frost: translucent wash + speckle across the entire body.
     if (opts.glassFrost) {
-      const fa = (opts.glassFrostAmount / 100);
-      ctx.fillStyle = `rgba(255,255,255,${0.10 + fa * 0.45})`;
+      const fa = opts.glassFrostAmount / 100;
+      ctx.fillStyle = `rgba(255,255,255,${0.08 + fa * 0.5})`;
       ctx.fillRect(0, 0, c.width, c.height);
       const rng = mulberry32(24680);
-      const dots = Math.round((c.width * c.height) / (900 / res));
+      const dots = Math.round((c.width * c.height) / (700 / res));
       for (let i = 0; i < dots; i++) {
         const x = rng() * c.width, y = rng() * c.height;
-        const r = (0.5 + rng() * 1.4) * res;
-        ctx.fillStyle = `rgba(255,255,255,${0.04 + rng() * 0.10 * fa})`;
+        const r = (0.5 + rng() * 1.6) * res;
+        ctx.fillStyle = `rgba(255,255,255,${0.03 + rng() * 0.12 * fa})`;
         ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
       }
     }
 
-    // Directional sheen sweep.
+    // Diagonal glare bands sweeping across the body (the classic glass reflection).
     const g = cssAngleToCanvasGradient(opts.glassAngle, cx, cy, halfDiag);
-    const sweep = ctx.createLinearGradient(g.x1, g.y1, g.x2, g.y2);
-    sweep.addColorStop(0, `rgba(255,255,255,${0.55 * sheen})`);
-    sweep.addColorStop(0.35, `rgba(255,255,255,${0.12 * sheen})`);
-    sweep.addColorStop(0.55, 'rgba(255,255,255,0)');
-    sweep.addColorStop(0.85, `rgba(255,255,255,${0.18 * sheen})`);
-    sweep.addColorStop(1, `rgba(255,255,255,${0.45 * sheen})`);
-    ctx.fillStyle = sweep;
+    const glare = ctx.createLinearGradient(g.x1, g.y1, g.x2, g.y2);
+    glare.addColorStop(0.00, 'rgba(255,255,255,0)');
+    glare.addColorStop(0.20, `rgba(255,255,255,${0.30 * sheen})`);
+    glare.addColorStop(0.27, `rgba(255,255,255,${0.05 * sheen})`);
+    glare.addColorStop(0.33, `rgba(255,255,255,${0.14 * sheen})`);
+    glare.addColorStop(0.45, 'rgba(255,255,255,0)');
+    glare.addColorStop(0.78, 'rgba(255,255,255,0)');
+    glare.addColorStop(0.86, `rgba(255,255,255,${0.16 * sheen})`);
+    glare.addColorStop(1.00, `rgba(255,255,255,${0.32 * sheen})`);
+    ctx.fillStyle = glare;
     ctx.fillRect(0, 0, c.width, c.height);
 
-    // Bright inner bevel highlight (top-left light wrap).
+    // ---- RIM (edge emphasis) ----
+    // Bright bevelled inner highlight (light wraps the top-left).
     ctx.lineJoin = 'round';
     ctx.lineWidth = thick * 0.55;
     ctx.strokeStyle = `rgba(255,255,255,${0.5 * (0.4 + sheen)})`;
@@ -630,26 +644,23 @@
       ctx.stroke();
     }
 
-    // Subtle dark outer edge for thickness read.
+    // Subtle dark outer edge for a sense of thickness.
     ctx.lineWidth = Math.max(1, thick * 0.16);
     ctx.strokeStyle = 'rgba(0,0,0,0.28)';
     roundRect(ctx, ctx.lineWidth / 2, ctx.lineWidth / 2, c.width - ctx.lineWidth, c.height - ctx.lineWidth, radius);
     ctx.stroke();
 
-    // Punch out the centre so only the rim band remains.
-    ctx.globalCompositeOperation = 'destination-out';
-    roundRect(ctx, thick, thick, c.width - thick * 2, c.height - thick * 2, Math.max(0, innerRad));
-    ctx.fillStyle = '#000';
-    ctx.fill();
-    ctx.globalCompositeOperation = 'source-over';
     ctx.restore();
     return c;
   }
 
+  // Iridescent foil stops for the holographic bezel.
+  const HOLO_STOPS = ['#ff5e8a', '#ffd86f', '#7bffb0', '#5ec8ff', '#b88cff', '#ff7bd5', '#ff5e8a'];
+
   // Bezel paint as a CSS background string (preview).
   function bezelPaintCSS(style, color) {
-    if (style === 'brushed') {
-      return `repeating-linear-gradient(90deg, ${shade(color, -18)} 0px, ${shade(color, 14)} 2px, ${shade(color, -8)} 4px), linear-gradient(180deg, ${shade(color, 20)}, ${shade(color, -22)})`;
+    if (style === 'holo') {
+      return `linear-gradient(115deg, ${HOLO_STOPS.join(', ')})`;
     }
     if (style === 'glass') {
       return `linear-gradient(135deg, ${shade(color, 30)} 0%, ${color} 45%, ${shade(color, -24)} 100%)`;
@@ -659,11 +670,13 @@
 
   // Bezel paint as a canvas fillStyle (export). ctx + rect needed for gradients.
   function bezelPaintCanvas(ctx, style, color, x, y, w, h) {
-    if (style === 'brushed') {
-      const grad = ctx.createLinearGradient(x, y, x, y + h);
-      grad.addColorStop(0, shade(color, 20));
-      grad.addColorStop(0.5, shade(color, -6));
-      grad.addColorStop(1, shade(color, -22));
+    if (style === 'holo') {
+      // angle ~115deg across the rect
+      const a = 115 * Math.PI / 180;
+      const dx = Math.cos(a), dy = Math.sin(a);
+      const hx = (Math.abs(dx) * w + Math.abs(dy) * h) / 2;
+      const grad = ctx.createLinearGradient(x + w / 2 - dx * hx, y + h / 2 - dy * hx, x + w / 2 + dx * hx, y + h / 2 + dy * hx);
+      HOLO_STOPS.forEach((cstop, i) => grad.addColorStop(i / (HOLO_STOPS.length - 1), cstop));
       return grad;
     }
     if (style === 'glass') {
@@ -1237,6 +1250,7 @@
 
     screenEdge.style.backgroundImage = '';
     screenEdge.classList.remove('active');
+    screen_.style.visibility = 'visible';
     screen_.style.webkitMaskImage = ''; screen_.style.maskImage = '';
     screenBack.style.webkitMaskImage = ''; screenBack.style.maskImage = '';
     _previewMemo = { key: '', edgeUrl: '', maskUrl: '' };
