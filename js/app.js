@@ -477,21 +477,29 @@
     screenShadow.style.display = 'none';
 
     // --- Background ---
+    // NOTE: never paint an opaque background on .capture-area. It has
+    // transform-style: preserve-3d, and an opaque paint on a preserve-3d
+    // element makes Chromium flatten/recomposite the 3D subtree, which then
+    // clips the rotated panel (nested overflow:hidden) — the "non-transparent
+    // bg cuts off the mockup" bug. Instead always paint the backdrop on the
+    // flat .checkerboard layer that sits behind the capture area, and keep
+    // capture-area + viewport transparent so the 3D context stays intact.
+    captureArea.style.background = 'transparent';
+    viewport.style.background = '';
+    checkerboard.style.display = '';
     switch (state.bgMode) {
       case 'transparent':
-        checkerboard.style.display = '';
-        viewport.style.background = '';
-        captureArea.style.background = 'transparent';
+        // fall back to the CSS checker pattern (#131313 + gradients)
+        checkerboard.style.backgroundImage = '';
+        checkerboard.style.backgroundColor = '';
         break;
       case 'color':
-        checkerboard.style.display = 'none';
-        viewport.style.background = state.bgColor;
-        captureArea.style.background = state.bgColor;
+        checkerboard.style.backgroundImage = 'none';
+        checkerboard.style.backgroundColor = state.bgColor;
         break;
       case 'greenscreen':
-        checkerboard.style.display = 'none';
-        viewport.style.background = '#00FF00';
-        captureArea.style.background = '#00FF00';
+        checkerboard.style.backgroundImage = 'none';
+        checkerboard.style.backgroundColor = '#00FF00';
         break;
     }
   }
